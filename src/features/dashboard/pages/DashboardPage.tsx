@@ -1,73 +1,170 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatCard } from "../../../components/ui/StatCard";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { getRoleTone } from "../../auth/access";
+import { getSystemAdminSummary, getTenantAdminSummary } from "../../auth/api/authApi";
+import { useAuth } from "../../auth/context/useAuth";
+import type { SystemAdminSummary, TenantAdminSummary } from "../../../types/auth";
 
-const statCards = [
-  {
-    label: "Users In Scope",
-    value: "128",
-    note: "Preview metric for tenant-aware user counts.",
-  },
-  {
-    label: "Recent Audit Events",
-    value: "1,204",
-    note: "Layout placeholder for log volume visibility.",
-  },
-  {
-    label: "Active Roles",
-    value: "3",
-    note: "Mapped to SYS_ADMIN, TENANT_ADMIN, and USER.",
-  },
-];
+function formatMetric(value: number | undefined) {
+  if (value === undefined) {
+    return "...";
+  }
+
+  return value.toLocaleString();
+}
 
 export function DashboardPage() {
+  const { accessToken, tenant, user } = useAuth();
+  const isAdmin = user?.role === "SYS_ADMIN" || user?.role === "TENANT_ADMIN";
+  const summaryQuery = useQuery({
+    queryKey: ["dashboard-summary", user?.role, tenant?.id],
+    queryFn: async () => {
+      if (!accessToken || !user) {
+        throw new Error("A valid session is required to load dashboard metrics.");
+      }
+
+      if (user.role === "SYS_ADMIN") {
+        return getSystemAdminSummary(accessToken);
+      }
+
+      return getTenantAdminSummary(accessToken);
+    },
+    enabled: Boolean(accessToken && user && isAdmin),
+  });
+
+  if (!user || !tenant) {
+    return null;
+  }
+
+  const systemSummary =
+    user.role === "SYS_ADMIN" ? (summaryQuery.data as SystemAdminSummary | undefined) : undefined;
+  const tenantSummary =
+    user.role === "TENANT_ADMIN" ? (summaryQuery.data as TenantAdminSummary | undefined) : undefined;
+  const routeAccess = user.role === "USER" ? "Dashboard" : "Dashboard, Users, Audit Logs";
+  const statCards =
+    user.role === "SYS_ADMIN"
+      ? [
+          {
+            label: "Tenants In Scope",
+            value: formatMetric(systemSummary?.totalTenants),
+            note: "Live tenant count from the system-admin summary endpoint.",
+          },
+          {
+            label: "Platform Users",
+            value: formatMetric(systemSummary?.totalUsers),
+            note: "All users visible to the current system administrator.",
+          },
+          {
+            label: "System Admins",
+            value: formatMetric(systemSummary?.systemAdmins),
+            note: "Current users with platform-wide administrative authority.",
+          },
+        ]
+      : user.role === "TENANT_ADMIN"
+        ? [
+            {
+              label: "Users In Tenant",
+              value: formatMetric(tenantSummary?.totalUsers),
+              note: "Live count for the tenant currently bound to your session.",
+            },
+            {
+              label: "Active Accounts",
+              value: formatMetric(tenantSummary?.activeUsers),
+              note: "Only active tenant users are counted here.",
+            },
+            {
+              label: "Tenant Admins",
+              value: formatMetric(tenantSummary?.tenantAdmins),
+              note: "Administrative users within your current tenant scope.",
+            },
+          ]
+        : [
+            {
+              label: "Current Role",
+              value: user.role,
+              note: "The IAM backend controls your effective RBAC scope.",
+            },
+            {
+              label: "Tenant Slug",
+              value: tenant.slug,
+              note: "Tenant context travels with the authenticated session.",
+            },
+            {
+              label: "Session State",
+              value: "Authenticated",
+              note: "The protected workspace is active and route guards are enforced.",
+            },
+          ];
+
   return (
     <>
       <PageHeader
         eyebrow="Dashboard"
-        title="Operational visibility for admins and tenant users"
-        description="This foundation view defines the layout for session context, tenant overview, and role-aware navigation entry points."
-        actions={<StatusPill tone="accent">Scaffold Ready</StatusPill>}
+        title={`Welcome back, ${user.fullName}`}
+        description="This screen now reflects the live IAM session, tenant context, and role-aware entry points available to the signed-in user."
+        actions={<StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill>}
       />
 
       <div className="hero-grid">
         <SurfaceCard>
           <div className="stack">
-            <p className="eyebrow">Product Intent</p>
-            <h3>One portal for access, users, and audit visibility</h3>
+            <p className="eyebrow">Session Context</p>
+            <h3>Current identity and tenant scope</h3>
             <p className="page-copy">
-              The dashboard is designed to become the first screen after login. It will surface current
-              user identity, tenant context, role permissions, and quick actions tied to the IAM backend.
+              The frontend now resolves your signed-in identity through the IAM backend and uses that
+              context to shape navigation, protected routes, and administrative visibility.
             </p>
-            <div className="info-banner">
-              <strong>Next integration step</strong>
-              <p>
-                Replace preview metrics and session content with live IAM-backed data during the auth and
-                dashboard phases.
-              </p>
-            </div>
+            <ul className="session-list">
+              <li>
+                <span className="metric-label">Full Name</span>
+                <strong>{user.fullName}</strong>
+              </li>
+              <li>
+                <span className="metric-label">Email</span>
+                <strong>{user.email}</strong>
+              </li>
+              <li>
+                <span className="metric-label">Tenant</span>
+                <strong>{tenant.name}</strong>
+              </li>
+            </ul>
           </div>
         </SurfaceCard>
 
         <SurfaceCard>
           <div className="stack">
-            <p className="eyebrow">Session Preview</p>
-            <h3>Target dashboard summary</h3>
+            <p className="eyebrow">Access Map</p>
+            <h3>Role-aware route access</h3>
             <ul className="session-list">
               <li>
                 <span className="metric-label">Current Role</span>
-                <StatusPill tone="warning">TENANT_ADMIN</StatusPill>
+                <StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill>
               </li>
               <li>
-                <span className="metric-label">Tenant</span>
-                <strong>Northwind Holdings</strong>
+                <span className="metric-label">Tenant Slug</span>
+                <strong>{tenant.slug}</strong>
               </li>
               <li>
                 <span className="metric-label">Route Access</span>
-                <strong>Dashboard, Users, Audit Logs</strong>
+                <strong>{routeAccess}</strong>
               </li>
             </ul>
+
+            {summaryQuery.isError ? (
+              <div className="info-banner">
+                <strong>Live metrics unavailable</strong>
+                <p>
+                  {summaryQuery.error instanceof Error
+                    ? summaryQuery.error.message
+                    : "The dashboard could not load the current summary from the IAM service."}
+                </p>
+              </div>
+            ) : null}
           </div>
         </SurfaceCard>
       </div>
@@ -82,30 +179,49 @@ export function DashboardPage() {
         <SurfaceCard>
           <div className="stack">
             <p className="eyebrow">Authentication</p>
-            <h3>Session bootstrap</h3>
+            <h3>Protected session active</h3>
             <p className="helper-text">
-              Login, logout, refresh, and route protection will be wired into the IAM service next.
+              Login, logout, session restore, and protected route enforcement are now backed by the IAM
+              auth flow.
             </p>
           </div>
         </SurfaceCard>
 
         <SurfaceCard>
           <div className="stack">
-            <p className="eyebrow">User Management</p>
-            <h3>Administrative workflows</h3>
+            <p className="eyebrow">Navigation</p>
+            <h3>{isAdmin ? "Administrative workflows" : "Personal workspace scope"}</h3>
             <p className="helper-text">
-              The UI footprint is ready for list, create, edit, delete, and role assignment actions.
+              {isAdmin
+                ? "Administrative routes are visible because your current role is allowed to access them."
+                : "Administrative routes are hidden because your current role is limited to self-service access."}
             </p>
+            {isAdmin ? (
+              <div className="split-actions">
+                <Link className="button button-secondary" to="/users">
+                  Open user management
+                </Link>
+              </div>
+            ) : null}
           </div>
         </SurfaceCard>
 
         <SurfaceCard>
           <div className="stack">
             <p className="eyebrow">Audit Logs</p>
-            <h3>Activity review</h3>
+            <h3>{isAdmin ? "Activity review is available" : "Administrative audit access is restricted"}</h3>
             <p className="helper-text">
-              Filtering, event inspection, and tenant scoping will land in the next feature slice.
+              {isAdmin
+                ? "The audit route is now protected by role. Table data integration is the next feature slice."
+                : "Audit visibility remains reserved for administrative roles even when a user knows the route."}
             </p>
+            {isAdmin ? (
+              <div className="split-actions">
+                <Link className="button button-secondary" to="/audit-logs">
+                  Review audit route
+                </Link>
+              </div>
+            ) : null}
           </div>
         </SurfaceCard>
       </div>

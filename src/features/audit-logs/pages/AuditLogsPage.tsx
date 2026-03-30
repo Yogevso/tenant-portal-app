@@ -1,6 +1,7 @@
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { useAuth } from "../../auth/context/useAuth";
 
 const previewEvents = [
   {
@@ -24,6 +25,8 @@ const previewEvents = [
 ];
 
 export function AuditLogsPage() {
+  const { tenant, user } = useAuth();
+
   return (
     <>
       <PageHeader
@@ -49,10 +52,12 @@ export function AuditLogsPage() {
           </SurfaceCard>
 
           <div className="info-banner">
-            <strong>Audit viewer scaffold</strong>
+            <strong>Role guard enabled</strong>
             <p>
-              Filtering is visual only for now. The next feature phase will bind these controls to the
-              IAM audit-log endpoints.
+              Only administrative roles can reach this screen now. The next phase will bind these
+              filters to the IAM audit-log APIs for{" "}
+              <strong>{user?.role === "SYS_ADMIN" ? "platform-wide" : tenant?.name ?? "tenant-scoped"}</strong>{" "}
+              visibility.
             </p>
           </div>
 

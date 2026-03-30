@@ -1,28 +1,47 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { StatusPill } from "../../components/ui/StatusPill";
+import { ADMIN_ROLES, getRoleTone } from "../../features/auth/access";
+import { useAuth } from "../../features/auth/context/useAuth";
 import { env } from "../../lib/config/env";
 
 const navItems = [
   {
     label: "Dashboard",
     to: "/dashboard",
+    roles: ["SYS_ADMIN", "TENANT_ADMIN", "USER"] as const,
   },
   {
     label: "User Management",
     to: "/users",
+    roles: ADMIN_ROLES,
   },
   {
     label: "Audit Logs",
     to: "/audit-logs",
-  },
-  {
-    label: "Login",
-    to: "/login",
+    roles: ADMIN_ROLES,
   },
 ];
 
 export function AppShell() {
+  const navigate = useNavigate();
+  const { logout, tenant, user } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const availableNavItems = navItems.filter((item) => (user ? item.roles.includes(user.role) : false));
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -35,7 +54,7 @@ export function AppShell() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary navigation">
-          {navItems.map((item) => (
+          {availableNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -47,24 +66,35 @@ export function AppShell() {
         </nav>
 
         <div className="sidebar-footer">
-          <StatusPill tone="accent">Phase 1</StatusPill>
-          <p>Core shell and route structure in place. IAM integration is next.</p>
+          {user ? <StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill> : null}
+          <div className="sidebar-profile">
+            <strong>{user?.fullName ?? "Authenticated User"}</strong>
+            <span>{tenant?.name ?? "Tenant scope pending"}</span>
+          </div>
+          <p>Access token stays in memory. Session recovery uses the backend refresh flow.</p>
+          <button className="button button-secondary" type="button" onClick={handleLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? "Signing out..." : "Log out"}
+          </button>
         </div>
       </aside>
 
       <div className="workspace">
         <header className="app-topbar">
           <div>
-            <p className="eyebrow">Foundation Build</p>
-            <h2>Tenant Portal Frontend</h2>
+            <p className="eyebrow">Authenticated Workspace</p>
+            <h2>{tenant?.name ?? "Tenant Portal Frontend"}</h2>
           </div>
 
           <div className="topbar-meta">
             <div>
+              <span className="topbar-label">Signed In As</span>
+              <strong>{user?.email ?? "Session pending"}</strong>
+            </div>
+            {user ? <StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill> : null}
+            <div>
               <span className="topbar-label">Target API</span>
               <strong>{env.apiBaseUrl}</strong>
             </div>
-            <StatusPill tone="neutral">Vite + React + TypeScript</StatusPill>
           </div>
         </header>
 

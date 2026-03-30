@@ -43,9 +43,10 @@ npm run dev
 
 The project currently includes:
 
-- Phase 1 frontend scaffold and routing foundation
-- Shared app shell and responsive layout
-- Initial pages for login, dashboard, user management, audit logs, unauthorized, and not found states
+- Auth provider with login, logout, refresh-based session restore, and protected route guards
+- Shared app shell with role-aware navigation for `SYS_ADMIN`, `TENANT_ADMIN`, and `USER`
+- Live dashboard session context plus IAM-backed summary metrics for administrator roles
+- Placeholder user-management and audit-log screens behind real RBAC enforcement
 - Query provider and environment configuration setup
 
 ## Project Structure

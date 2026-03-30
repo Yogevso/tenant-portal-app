@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 
 import { AppShell } from "../layouts/AppShell";
+import { ADMIN_ROLES } from "../../features/auth/access";
+import { GuestOnlyRoute, RequireAuth, RequireRoles } from "../../features/auth/components/RouteGuards";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
 import { AuditLogsPage } from "../../features/audit-logs/pages/AuditLogsPage";
 import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
@@ -15,26 +17,40 @@ const router = createBrowserRouter([
   },
   {
     path: "/login",
-    element: <LoginPage />,
+    element: (
+      <GuestOnlyRoute>
+        <LoginPage />
+      </GuestOnlyRoute>
+    ),
   },
   {
-    element: <AppShell />,
+    element: <RequireAuth />,
     children: [
       {
-        path: "/dashboard",
-        element: <DashboardPage />,
-      },
-      {
-        path: "/users",
-        element: <UsersPage />,
-      },
-      {
-        path: "/audit-logs",
-        element: <AuditLogsPage />,
-      },
-      {
-        path: "/unauthorized",
-        element: <UnauthorizedPage />,
+        element: <AppShell />,
+        children: [
+          {
+            path: "/dashboard",
+            element: <DashboardPage />,
+          },
+          {
+            element: <RequireRoles allowedRoles={ADMIN_ROLES} />,
+            children: [
+              {
+                path: "/users",
+                element: <UsersPage />,
+              },
+              {
+                path: "/audit-logs",
+                element: <AuditLogsPage />,
+              },
+            ],
+          },
+          {
+            path: "/unauthorized",
+            element: <UnauthorizedPage />,
+          },
+        ],
       },
     ],
   },

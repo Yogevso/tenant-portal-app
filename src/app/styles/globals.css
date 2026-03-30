@@ -147,6 +147,20 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.sidebar-profile {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-profile strong {
+  font-size: 1rem;
+}
+
+.sidebar-profile span {
+  color: rgba(245, 247, 251, 0.72);
+  font-size: 0.92rem;
+}
+
 .workspace {
   display: grid;
   gap: 24px;
@@ -483,6 +497,31 @@ button {
   font-size: 0.92rem;
 }
 
+.field-error {
+  color: #aa4e32;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.alert {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+}
+
+.alert-danger {
+  color: #7b281b;
+  border-color: rgba(170, 78, 50, 0.18);
+  background: rgba(194, 105, 68, 0.14);
+}
+
+.alert-warning {
+  color: #8a5527;
+  border-color: rgba(194, 105, 68, 0.18);
+  background: rgba(194, 105, 68, 0.12);
+}
+
 .feature-tile {
   display: grid;
   gap: 8px;
@@ -496,6 +535,19 @@ button {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.auth-gate {
+  align-items: center;
+}
+
+.auth-gate .surface-card {
+  width: min(540px, 100%);
+  text-align: center;
+}
+
+.auth-gate-card {
+  align-items: center;
 }
 
 ul {

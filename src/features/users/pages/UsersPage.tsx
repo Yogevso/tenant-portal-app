@@ -1,6 +1,7 @@
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { useAuth } from "../../auth/context/useAuth";
 
 const previewUsers = [
   {
@@ -40,6 +41,8 @@ function statusTone(status: string) {
 }
 
 export function UsersPage() {
+  const { tenant } = useAuth();
+
   return (
     <>
       <PageHeader
@@ -71,10 +74,10 @@ export function UsersPage() {
           </SurfaceCard>
 
           <div className="info-banner">
-            <strong>Preview table only</strong>
+            <strong>Protected route active</strong>
             <p>
-              Live user data, form validation, and mutation flows will connect to the IAM user-management
-              API in the next implementation phase.
+              Auth and RBAC are now enforced. The next slice will replace preview rows with live
+              user-management data for <strong>{tenant?.name ?? "the current tenant"}</strong>.
             </p>
           </div>
 

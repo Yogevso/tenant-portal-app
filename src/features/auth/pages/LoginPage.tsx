@@ -1,8 +1,91 @@
-import { Link } from "react-router-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
 
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { ApiError } from "../../../lib/api/client";
+import { env } from "../../../lib/config/env";
+import { useAuth } from "../context/useAuth";
+
+const loginSchema = z.object({
+  tenantSlug: z
+    .string()
+    .trim()
+    .min(3, "Tenant slug must be at least 3 characters.")
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
+  email: z.string().trim().email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+interface LoginRouteState {
+  fromPath?: string;
+  reason?: "session_expired" | "service_unavailable" | null;
+}
 
 export function LoginPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { authFailureReason, clearAuthFailureReason, login } = useAuth();
+  const [formError, setFormError] = useState<string | null>(null);
+  const routeState = (location.state as LoginRouteState | null) ?? null;
+  const redirectTarget = routeState?.fromPath ?? "/dashboard";
+  const sessionNotice = routeState?.reason ?? authFailureReason;
+  const {
+    formState: { errors, isSubmitting },
+    handleSubmit,
+    register,
+    setError,
+  } = useForm<LoginFormValues>({
+    defaultValues: {
+      tenantSlug: "",
+      email: "",
+      password: "",
+    },
+    resolver: zodResolver(loginSchema),
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (values: LoginFormValues) => {
+      await login(values);
+    },
+    onSuccess: () => {
+      navigate(redirectTarget, { replace: true });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "validation_error" && error.details) {
+        const fieldMap: Record<string, keyof LoginFormValues> = {
+          "body.tenant_slug": "tenantSlug",
+          "body.email": "email",
+          "body.password": "password",
+        };
+
+        error.details.forEach((detail) => {
+          const fieldName = fieldMap[detail.field];
+
+          if (fieldName) {
+            setError(fieldName, {
+              type: "server",
+              message: detail.message,
+            });
+          }
+        });
+      }
+
+      setFormError(error instanceof Error ? error.message : "The portal could not complete sign-in.");
+    },
+  });
+
+  function onSubmit(values: LoginFormValues) {
+    clearAuthFailureReason();
+    setFormError(null);
+    loginMutation.mutate(values);
+  }
+
   return (
     <main className="login-page">
       <div className="login-shell">
@@ -13,22 +96,22 @@ export function LoginPage() {
           </div>
 
           <p>
-            This screen is ready for IAM-backed authentication. Phase 2 will connect the form to JWT
-            login, refresh handling, protected routes, and session recovery.
+            Sign in with tenant context, email, and password. The portal keeps the access token in
+            memory and uses the IAM refresh flow to restore the session after a reload.
           </p>
 
           <div className="tile-grid">
             <div className="feature-tile">
-              <h3>JWT Session Flow</h3>
-              <p>Access tokens, refresh strategy, and clean sign-out handling.</p>
+              <h3>Tenant-Scoped Login</h3>
+              <p>The backend expects `tenant_slug`, `email`, and `password` on every sign-in.</p>
             </div>
             <div className="feature-tile">
               <h3>RBAC-Aware Access</h3>
-              <p>Role-specific routes and controls for admins and tenant users.</p>
+              <p>Routes and navigation adapt to `SYS_ADMIN`, `TENANT_ADMIN`, and `USER` sessions.</p>
             </div>
             <div className="feature-tile">
-              <h3>Tenant Context</h3>
-              <p>Session bootstrap will resolve tenant scope immediately after login.</p>
+              <h3>Session Recovery</h3>
+              <p>Refresh rotation restores the workspace after reload while the session is still valid.</p>
             </div>
           </div>
         </section>
@@ -38,37 +121,81 @@ export function LoginPage() {
             <p className="eyebrow">Sign In</p>
             <h2>Connect to the IAM backend</h2>
             <p className="page-description">
-              The form contract is in place. Live authentication will be wired in next.
+              Target API: <strong>{env.apiBaseUrl}</strong>
             </p>
           </div>
 
-          <form className="form-grid">
+          {sessionNotice === "session_expired" ? (
+            <div className="alert alert-warning" role="status">
+              Your previous session expired. Sign in again to continue.
+            </div>
+          ) : null}
+
+          {sessionNotice === "service_unavailable" ? (
+            <div className="alert alert-warning" role="status">
+              The portal could not restore the last session. Verify that the IAM service is running,
+              then sign in again.
+            </div>
+          ) : null}
+
+          {formError ? (
+            <div className="alert alert-danger" role="alert">
+              {formError}
+            </div>
+          ) : null}
+
+          <form className="form-grid" onSubmit={handleSubmit(onSubmit)}>
+            <div className="field">
+              <label htmlFor="tenantSlug">Tenant Slug</label>
+              <input
+                autoComplete="organization"
+                className="input"
+                id="tenantSlug"
+                placeholder="platform"
+                {...register("tenantSlug")}
+              />
+              {errors.tenantSlug ? <span className="field-error">{errors.tenantSlug.message}</span> : null}
+            </div>
+
             <div className="field">
               <label htmlFor="email">Email</label>
-              <input className="input" id="email" type="email" placeholder="admin@tenant.io" />
+              <input
+                autoComplete="username"
+                className="input"
+                id="email"
+                type="email"
+                placeholder="admin@tenant.io"
+                {...register("email")}
+              />
+              {errors.email ? <span className="field-error">{errors.email.message}</span> : null}
             </div>
 
             <div className="field">
               <label htmlFor="password">Password</label>
-              <input className="input" id="password" type="password" placeholder="Enter your password" />
+              <input
+                autoComplete="current-password"
+                className="input"
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                {...register("password")}
+              />
+              {errors.password ? <span className="field-error">{errors.password.message}</span> : null}
             </div>
 
-            <button className="button button-primary" type="button" disabled>
-              IAM integration in progress
+            <button className="button button-primary" type="submit" disabled={isSubmitting || loginMutation.isPending}>
+              {isSubmitting || loginMutation.isPending ? "Signing in..." : "Sign in to the portal"}
             </button>
           </form>
 
           <SurfaceCard>
             <div className="stack">
-              <h3>Current scaffold scope</h3>
+              <h3>Session model</h3>
               <p className="helper-text">
-                While auth is being connected, you can review the routed app shell and feature screens.
+                Access tokens stay out of persistent storage. The refresh token is kept in browser
+                session storage so reloads can restore the workspace without keeping long-lived auth
+                data after the browser session ends.
               </p>
-              <div className="split-actions">
-                <Link className="button button-secondary" to="/dashboard">
-                  Review dashboard scaffold
-                </Link>
-              </div>
             </div>
           </SurfaceCard>
         </section>
