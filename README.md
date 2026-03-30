@@ -32,6 +32,8 @@ cp .env.example .env
 npm run dev
 ```
 
+The default local frontend expects the IAM backend at `http://localhost:8000`.
+
 ## Available Scripts
 
 - `npm run dev` - start the Vite development server
@@ -65,16 +67,74 @@ Build the production image:
 docker build -t tenant-portal-app .
 ```
 
-Run it with runtime configuration:
+Run it against a backend already exposed on the host at `http://localhost:8000`:
+
+```bash
+docker run --rm -p 8080:80 tenant-portal-app
+```
+
+Open `http://localhost:8080` after the container starts.
+
+The container serves the static Vite bundle through Nginx with SPA route fallback enabled and proxies `/api/*` to `http://host.docker.internal:8000`. That keeps the normal local Docker demo same-origin on `:8080` and avoids browser CORS failures in the portal path.
+
+If you want the container to call an external API directly instead of using the built-in proxy, override the runtime config:
 
 ```bash
 docker run --rm -p 8080:80 \
-  -e VITE_APP_NAME="Tenant Portal" \
   -e VITE_API_BASE_URL="https://iam.example.com" \
   tenant-portal-app
 ```
 
-The container serves the static Vite bundle through Nginx with SPA route fallback enabled.
+## Full Stack Local Demo
+
+With the sibling backend repository checked out next to this project, you can run the full stack locally:
+
+1. Start the backend:
+
+```bash
+cd ../identity-access-service
+docker compose up --build
+```
+
+2. Create or reset a local system administrator:
+
+```bash
+docker compose run --rm api iam-bootstrap-admin \
+  --tenant-name "Platform" \
+  --tenant-slug platform \
+  --full-name "System Admin" \
+  --email admin@platform.example \
+  --password "PortalAdmin123!" \
+  --reset-password
+```
+
+3. In this repository, run the frontend on port `3000` so it matches the backend CORS defaults:
+
+```bash
+npm run dev -- --port 3000
+```
+
+4. Open:
+
+- Portal: `http://localhost:3000`
+- API docs: `http://localhost:8000/docs`
+
+Optional Docker frontend:
+
+```bash
+docker build -t tenant-portal-app .
+docker run --rm -p 8080:80 tenant-portal-app
+```
+
+- Docker portal: `http://localhost:8080`
+
+Demo login:
+
+- Tenant slug: `platform`
+- Email: `admin@platform.example`
+- Password: `PortalAdmin123!`
+
+The sibling `identity-access-service` repo should allow both `http://localhost:3000` and `http://localhost:8080` in `CORS_ORIGINS` for local development and debugging.
 
 ## CI
 

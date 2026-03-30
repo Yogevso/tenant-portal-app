@@ -11,7 +11,7 @@ RUN npm run build
 FROM nginx:1.27-alpine AS runtime
 
 ENV VITE_APP_NAME="Tenant Portal" \
-    VITE_API_BASE_URL="http://localhost:8000"
+    VITE_API_BASE_URL="same-origin"
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh

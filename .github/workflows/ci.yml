@@ -53,7 +53,7 @@ jobs:
         run: |
           docker run -d --rm --name tenant-portal-app -p 8080:80 \
             -e VITE_APP_NAME="Tenant Portal (CI)" \
-            -e VITE_API_BASE_URL="https://iam.example.com" \
+            -e VITE_API_BASE_URL="same-origin" \
             tenant-portal-app:ci
 
       - name: Verify container responds
@@ -68,7 +68,7 @@ jobs:
 
       - name: Verify runtime config endpoint
         run: |
-          curl --fail --silent http://127.0.0.1:8080/runtime-config.js | grep "iam.example.com"
+          curl --fail --silent http://127.0.0.1:8080/runtime-config.js | grep "same-origin"
 
       - name: Stop container
         if: always()

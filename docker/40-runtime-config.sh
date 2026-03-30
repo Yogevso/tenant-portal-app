@@ -6,7 +6,7 @@ escape_for_js() {
 }
 
 APP_NAME_ESCAPED="$(escape_for_js "${VITE_APP_NAME:-Tenant Portal}")"
-API_BASE_URL_ESCAPED="$(escape_for_js "${VITE_API_BASE_URL:-http://localhost:8000}")"
+API_BASE_URL_ESCAPED="$(escape_for_js "${VITE_API_BASE_URL:-same-origin}")"
 
 cat <<EOF > /usr/share/nginx/html/runtime-config.js
 window.__TENANT_PORTAL_CONFIG__ = {

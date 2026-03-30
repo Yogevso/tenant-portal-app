@@ -47,7 +47,12 @@ export class ApiError extends Error {
 
 function buildApiUrl(path: string) {
   const normalizedPath = path.startsWith("/api/") ? path : `/api/v1${path}`;
-  return new URL(normalizedPath, env.apiBaseUrl).toString();
+  const baseUrl =
+    env.apiBaseUrl === "same-origin" && typeof window !== "undefined"
+      ? window.location.origin
+      : env.apiBaseUrl;
+
+  return new URL(normalizedPath, baseUrl).toString();
 }
 
 function isFormData(value: BodyInit | FormData | Record<string, unknown> | undefined): value is FormData {
