@@ -356,6 +356,11 @@ button {
   color: var(--ink-strong);
 }
 
+.button-danger {
+  color: #ffffff;
+  background: linear-gradient(135deg, #b14e34 0%, #8f3c29 100%);
+}
+
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -401,6 +406,10 @@ button {
 .stack {
   display: grid;
   gap: 10px;
+}
+
+.stack-tight {
+  gap: 4px;
 }
 
 .status-pill {
@@ -522,6 +531,12 @@ button {
   background: rgba(194, 105, 68, 0.12);
 }
 
+.alert-success {
+  color: var(--success);
+  border-color: rgba(27, 127, 91, 0.18);
+  background: rgba(27, 127, 91, 0.12);
+}
+
 .feature-tile {
   display: grid;
   gap: 8px;
@@ -548,6 +563,33 @@ button {
 
 .auth-gate-card {
   align-items: center;
+}
+
+.toolbar-wrap {
+  align-items: stretch;
+}
+
+.table-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.select-inline {
+  min-width: 160px;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 4px 0;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
 }
 
 ul {
