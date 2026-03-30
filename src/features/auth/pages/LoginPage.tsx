@@ -28,6 +28,30 @@ interface LoginRouteState {
   reason?: "session_expired" | "service_unavailable" | null;
 }
 
+const loginHighlights = [
+  {
+    eyebrow: "Identity",
+    title: "Tenant-scoped access",
+    description: "Every sign-in carries tenant context, user email, and password into the IAM flow.",
+  },
+  {
+    eyebrow: "Authorization",
+    title: "Role-aware workspace",
+    description: "The portal reshapes navigation and route access for SYS_ADMIN, TENANT_ADMIN, and USER.",
+  },
+  {
+    eyebrow: "Recovery",
+    title: "Session continuity",
+    description: "Refresh rotation restores valid workspaces after reload without keeping access tokens in storage.",
+  },
+] as const;
+
+const loginPrinciples = [
+  "Memory-only access tokens",
+  "Refresh-backed session restore",
+  "Role-aware route protection",
+] as const;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,43 +111,60 @@ export function LoginPage() {
     loginMutation.mutate(values);
   }
 
+  const apiTargetLabel =
+    env.apiBaseUrl === "same-origin" ? "Current origin proxy to the IAM backend" : env.apiBaseUrl;
+
   return (
     <main className="login-page">
       <div className="login-shell">
         <section className="login-panel">
-          <div>
+          <div className="login-panel-header">
             <p className="eyebrow">Tenant Access Portal</p>
             <h1>Secure sign-in for tenant operations.</h1>
+            <p className="login-intro">
+              Sign in with tenant context, email, and password. The portal keeps the access token in
+              memory and uses the IAM refresh flow to restore the session after a reload.
+            </p>
           </div>
 
-          <p>
-            Sign in with tenant context, email, and password. The portal keeps the access token in
-            memory and uses the IAM refresh flow to restore the session after a reload.
-          </p>
+          <div className="login-principle-row" aria-label="Core session principles">
+            {loginPrinciples.map((principle) => (
+              <span key={principle} className="login-principle">
+                {principle}
+              </span>
+            ))}
+          </div>
 
-          <div className="tile-grid">
-            <div className="feature-tile">
-              <h3>Tenant-Scoped Login</h3>
-              <p>The backend expects `tenant_slug`, `email`, and `password` on every sign-in.</p>
-            </div>
-            <div className="feature-tile">
-              <h3>RBAC-Aware Access</h3>
-              <p>Routes and navigation adapt to `SYS_ADMIN`, `TENANT_ADMIN`, and `USER` sessions.</p>
-            </div>
-            <div className="feature-tile">
-              <h3>Session Recovery</h3>
-              <p>Refresh rotation restores the workspace after reload while the session is still valid.</p>
-            </div>
+          <div className="login-feature-grid">
+            {loginHighlights.map((highlight) => (
+              <article key={highlight.title} className="login-feature-card">
+                <span className="login-feature-eyebrow">{highlight.eyebrow}</span>
+                <h3>{highlight.title}</h3>
+                <p>{highlight.description}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="login-runtime-note">
+            <p className="eyebrow">Runtime posture</p>
+            <p className="muted-copy">
+              Access tokens never persist between browser sessions. Session storage only keeps the
+              refresh path long enough to restore the workspace while the backend session is still valid.
+            </p>
           </div>
         </section>
 
         <section className="login-form-panel">
-          <div>
-            <p className="eyebrow">Sign In</p>
-            <h2>Connect to the IAM backend</h2>
-            <p className="page-description">
-              Target API: <strong>{env.apiBaseUrl}</strong>
-            </p>
+          <div className="login-form-header">
+            <div>
+              <p className="eyebrow">Sign In</p>
+              <h2>Connect to the IAM backend</h2>
+            </div>
+
+            <div className="login-api-card">
+              <span className="topbar-label">Target API</span>
+              <strong>{apiTargetLabel}</strong>
+            </div>
           </div>
 
           {sessionNotice === "session_expired" ? (
@@ -212,14 +253,23 @@ export function LoginPage() {
             </button>
           </form>
 
-          <SurfaceCard>
+          <SurfaceCard className="login-support-card">
             <div className="stack">
               <h3>Session model</h3>
-              <p className="helper-text">
-                Access tokens stay out of persistent storage. The refresh token is kept in browser
-                session storage so reloads can restore the workspace without keeping long-lived auth
-                data after the browser session ends.
-              </p>
+              <ul className="login-support-list">
+                <li>
+                  <span className="metric-label">Access token</span>
+                  <strong>In memory only</strong>
+                </li>
+                <li>
+                  <span className="metric-label">Refresh token</span>
+                  <strong>Session storage only</strong>
+                </li>
+                <li>
+                  <span className="metric-label">Recovery path</span>
+                  <strong>Backend refresh rotation</strong>
+                </li>
+              </ul>
             </div>
           </SurfaceCard>
         </section>

@@ -27,11 +27,26 @@ const actionOptions: Array<{ value: "all" | AuditAction; label: string }> = [
   { value: "TENANT_UPDATED", label: "Tenant updated" },
 ];
 
+const auditReviewControls = [
+  { label: "Action filter", value: "Live" },
+  { label: "Actor filter", value: "Live" },
+  { label: "Tenant scope", value: "Role-aware" },
+] as const;
+
 function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  const date = new Date(value);
+
+  return {
+    date: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date),
+    time: new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date),
+  };
 }
 
 function formatScopeLabel(tenant: TenantRecord | null, isGlobal: boolean) {
@@ -54,17 +69,63 @@ function buildActorLabel(actor: AuditActor | null) {
   return `${actor.fullName} (${actor.email})`;
 }
 
-function summarizeDetails(item: AuditLogItem) {
+function formatActionLabel(action: AuditAction) {
+  return action
+    .toLowerCase()
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function formatDetailKey(key: string) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function shortenValue(value: string, options: { start: number; end: number }) {
+  const normalized = value.trim();
+
+  if (normalized.length <= options.start + options.end + 3) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, options.start)}...${normalized.slice(-options.end)}`;
+}
+
+function getDetailEntries(item: AuditLogItem) {
   const detailEntries = Object.entries(item.details ?? {});
 
   if (detailEntries.length === 0) {
-    return `${item.resourceType}:${item.resourceId}`;
+    return [
+      {
+        key: "Event",
+        value: `${item.resourceType}:${item.resourceId}`,
+      },
+    ];
   }
 
   return detailEntries
-    .slice(0, 3)
-    .map(([key, value]) => `${key}: ${String(value)}`)
-    .join(" | ");
+    .slice(0, 2)
+    .map(([key, value]) => ({
+      key: formatDetailKey(key),
+      value: String(value),
+    }));
+}
+
+function formatUserAgent(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/^Mozilla\/5\.0\s*/, "")
+    .trim();
+}
+
+function getResourceLabel(item: AuditLogItem) {
+  return shortenValue(item.resourceId, { start: 8, end: 6 });
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -226,10 +287,25 @@ export function AuditLogsPage() {
         />
       </div>
 
-      <div className="content-grid">
-        <div className="stack">
-          <SurfaceCard>
-            <div className="toolbar toolbar-wrap">
+      <div className="audit-page-stack">
+        <SurfaceCard className="audit-toolbar-card">
+          <div className="audit-toolbar-header">
+            <div className="stack">
+              <p className="eyebrow">Review Filters</p>
+              <h3>Refine the live event stream</h3>
+              <p className="helper-text">
+                Adjust action, actor, tenant scope, and backend pagination without leaving the page.
+              </p>
+            </div>
+
+            <StatusPill tone="accent">
+              {isGlobalSystemView ? "System-wide query" : "Tenant-scoped query"}
+            </StatusPill>
+          </div>
+
+          <div className="audit-filter-grid">
+            <label className="audit-filter-field">
+              <span className="audit-filter-label">Action</span>
               <select
                 aria-label="Filter audit events by action"
                 className="select"
@@ -242,7 +318,10 @@ export function AuditLogsPage() {
                   </option>
                 ))}
               </select>
+            </label>
 
+            <label className="audit-filter-field">
+              <span className="audit-filter-label">Actor</span>
               <select
                 aria-label="Filter audit events by actor"
                 className="select"
@@ -257,8 +336,11 @@ export function AuditLogsPage() {
                   </option>
                 ))}
               </select>
+            </label>
 
-              {currentUser.role === "SYS_ADMIN" ? (
+            {currentUser.role === "SYS_ADMIN" ? (
+              <label className="audit-filter-field">
+                <span className="audit-filter-label">Tenant scope</span>
                 <select
                   aria-label="Filter audit events by tenant scope"
                   className="select"
@@ -273,8 +355,10 @@ export function AuditLogsPage() {
                     </option>
                   ))}
                 </select>
-              ) : null}
+              </label>
+            ) : null}
 
+            <div className="audit-filter-actions">
               <button
                 aria-busy={auditLogsQuery.isFetching}
                 className="button button-secondary"
@@ -285,77 +369,93 @@ export function AuditLogsPage() {
                 {auditLogsQuery.isFetching ? "Refreshing..." : "Refresh events"}
               </button>
             </div>
-          </SurfaceCard>
-
-          {tenantsQuery.isError ? (
-            <InlineAlert tone="warning" title="Tenant scopes unavailable">
-              {getErrorMessage(tenantsQuery.error, "The tenant scope list could not be loaded.")}
-            </InlineAlert>
-          ) : null}
-
-          {scopedUsersQuery.isError ? (
-            <InlineAlert tone="warning" title="Actor options limited">
-              Actor options are limited to the current event page because the scoped user list could not
-              be loaded.
-            </InlineAlert>
-          ) : null}
-
-          <div className="info-banner">
-            <strong>Supported backend filters</strong>
-            <p>
-              Action, actor, tenant, and pagination are live. Date-range filtering is not exposed by the
-              current IAM audit API yet, so it is intentionally not faked in the UI.
-            </p>
           </div>
+        </SurfaceCard>
 
-          {auditLogsQuery.isPending ? (
-            <StatePanel
-              eyebrow="Loading"
-              tone="accent"
-              title="Loading audit events"
-              description="The portal is fetching the current event stream from the IAM backend."
-            />
-          ) : auditLogsQuery.isError ? (
-            <StatePanel
-              eyebrow="Sync Error"
-              tone="warning"
-              title="Audit log feed unavailable"
-              description={getErrorMessage(
-                auditLogsQuery.error,
-                "The IAM service could not return audit events for the current scope.",
-              )}
-              actions={
-                <button className="button button-primary" type="button" onClick={() => void auditLogsQuery.refetch()}>
-                  Retry audit feed
-                </button>
-              }
-            />
-          ) : items.length === 0 ? (
-            <StatePanel
-              eyebrow="Empty State"
-              tone="neutral"
-              title="No audit events match the current filters"
-              description="Adjust the scope, action, or actor filter to broaden the current result set."
-            />
-          ) : (
-            <>
-              <div className="table-shell">
-                <table className="data-table">
-                  <caption className="sr-only">Audit events in the current scope</caption>
-                  <thead>
-                    <tr>
-                      <th>Timestamp</th>
-                      <th>Actor</th>
-                      <th>Action</th>
-                      <th>Scope</th>
-                      <th>Resource</th>
-                      <th>Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
+        {tenantsQuery.isError ? (
+          <InlineAlert tone="warning" title="Tenant scopes unavailable">
+            {getErrorMessage(tenantsQuery.error, "The tenant scope list could not be loaded.")}
+          </InlineAlert>
+        ) : null}
+
+        {scopedUsersQuery.isError ? (
+          <InlineAlert tone="warning" title="Actor options limited">
+            Actor options are limited to the current event page because the scoped user list could not
+            be loaded.
+          </InlineAlert>
+        ) : null}
+
+        <InlineAlert tone="info" title="Supported backend filters">
+          Action, actor, tenant, and pagination are live. Date-range filtering is not exposed by the
+          current IAM audit API yet, so it is intentionally not faked in the UI.
+        </InlineAlert>
+
+        {auditLogsQuery.isPending ? (
+          <StatePanel
+            eyebrow="Loading"
+            tone="accent"
+            title="Loading audit events"
+            description="The portal is fetching the current event stream from the IAM backend."
+          />
+        ) : auditLogsQuery.isError ? (
+          <StatePanel
+            eyebrow="Sync Error"
+            tone="warning"
+            title="Audit log feed unavailable"
+            description={getErrorMessage(
+              auditLogsQuery.error,
+              "The IAM service could not return audit events for the current scope.",
+            )}
+            actions={
+              <button className="button button-primary" type="button" onClick={() => void auditLogsQuery.refetch()}>
+                Retry audit feed
+              </button>
+            }
+          />
+        ) : items.length === 0 ? (
+          <StatePanel
+            eyebrow="Empty State"
+            tone="neutral"
+            title="No audit events match the current filters"
+            description="Adjust the scope, action, or actor filter to broaden the current result set."
+          />
+        ) : (
+          <>
+            <div className="table-shell">
+              <table className="data-table audit-data-table">
+                <colgroup>
+                  <col className="audit-col-timestamp" />
+                  <col className="audit-col-actor" />
+                  <col className="audit-col-action" />
+                  <col className="audit-col-scope" />
+                  <col className="audit-col-resource" />
+                  <col className="audit-col-details" />
+                </colgroup>
+                <caption className="sr-only">Audit events in the current scope</caption>
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Scope</th>
+                    <th>Resource</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const timestamp = formatTimestamp(item.createdAt);
+                    const detailEntries = getDetailEntries(item);
+                    const userAgent = formatUserAgent(item.userAgent);
+
+                    return (
                       <tr key={item.id}>
-                        <td data-label="Timestamp">{formatTimestamp(item.createdAt)}</td>
+                        <td data-label="Timestamp">
+                          <time className="audit-timestamp" dateTime={item.createdAt}>
+                            <strong>{timestamp.date}</strong>
+                            <span className="helper-text">{timestamp.time}</span>
+                          </time>
+                        </td>
                         <td data-label="Actor">
                           <div className="stack stack-tight">
                             <strong>{item.actor?.fullName ?? "System"}</strong>
@@ -363,7 +463,7 @@ export function AuditLogsPage() {
                           </div>
                         </td>
                         <td data-label="Action">
-                          <StatusPill tone="accent">{item.action}</StatusPill>
+                          <StatusPill tone="accent">{formatActionLabel(item.action)}</StatusPill>
                         </td>
                         <td data-label="Scope">
                           <div className="stack stack-tight">
@@ -372,80 +472,92 @@ export function AuditLogsPage() {
                           </div>
                         </td>
                         <td data-label="Resource">
-                          <div className="stack stack-tight">
+                          <div className="stack stack-tight audit-resource-cell">
                             <strong>{item.resourceType}</strong>
-                            <span className="helper-text">{item.resourceId}</span>
+                            <code className="audit-code" title={item.resourceId}>
+                              {getResourceLabel(item)}
+                            </code>
                           </div>
                         </td>
                         <td data-label="Details">
-                          <div className="stack stack-tight">
-                            <span>{summarizeDetails(item)}</span>
-                            {item.ipAddress || item.userAgent ? (
-                              <span className="helper-text">
-                                {[item.ipAddress, item.userAgent].filter(Boolean).join(" | ")}
+                          <div className="audit-detail-list">
+                            {detailEntries.map((entry) => (
+                              <div key={`${item.id}-${entry.key}`} className="audit-detail-row">
+                                <span className="audit-detail-key">{entry.key}</span>
+                                <span className="audit-detail-value" title={entry.value}>
+                                  {entry.value}
+                                </span>
+                              </div>
+                            ))}
+
+                            {item.ipAddress ? (
+                              <span className="helper-text audit-detail-meta" title={item.ipAddress}>
+                                IP: {item.ipAddress}
+                              </span>
+                            ) : null}
+
+                            {userAgent ? (
+                              <span className="helper-text audit-detail-meta" title={item.userAgent ?? undefined}>
+                                UA: {userAgent}
                               </span>
                             ) : null}
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-              <SurfaceCard>
-                <div className="toolbar pagination-bar">
-                  <div className="stack stack-tight">
-                    <strong>
-                      Showing {pageStart}-{pageEnd} of {totalItems}
-                    </strong>
-                    <span className="helper-text">
-                      Results are paginated directly by the backend audit endpoint.
-                    </span>
-                  </div>
-
-                  <div className="table-actions">
-                    <button
-                      className="button button-secondary"
-                      type="button"
-                      onClick={() => setOffset((currentOffset) => Math.max(0, currentOffset - AUDIT_PAGE_SIZE))}
-                      disabled={!canGoBack || auditLogsQuery.isFetching}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className="button button-secondary"
-                      type="button"
-                      onClick={() => setOffset((currentOffset) => currentOffset + AUDIT_PAGE_SIZE)}
-                      disabled={!canGoForward || auditLogsQuery.isFetching}
-                    >
-                      Next
-                    </button>
-                  </div>
+            <SurfaceCard>
+              <div className="toolbar pagination-bar">
+                <div className="stack stack-tight">
+                  <strong>
+                    Showing {pageStart}-{pageEnd} of {totalItems}
+                  </strong>
+                  <span className="helper-text">
+                    Results are paginated directly by the backend audit endpoint.
+                  </span>
                 </div>
-              </SurfaceCard>
-            </>
-          )}
-        </div>
 
-        <div className="stack">
+                <div className="table-actions">
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => setOffset((currentOffset) => Math.max(0, currentOffset - AUDIT_PAGE_SIZE))}
+                    disabled={!canGoBack || auditLogsQuery.isFetching}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => setOffset((currentOffset) => currentOffset + AUDIT_PAGE_SIZE)}
+                    disabled={!canGoForward || auditLogsQuery.isFetching}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </SurfaceCard>
+          </>
+        )}
+
+        <div className="audit-insight-grid">
           <SurfaceCard>
             <div className="stack">
-              <p className="eyebrow">Filter Surface</p>
-              <h3>Current review controls</h3>
+              <p className="eyebrow">Review Controls</p>
+              <h3>Current review surface</h3>
               <ul className="feature-list">
-                <li>
-                  <span className="metric-label">Action filter</span>
-                  <strong>Live</strong>
-                </li>
-                <li>
-                  <span className="metric-label">Actor filter</span>
-                  <strong>Live</strong>
-                </li>
-                <li>
-                  <span className="metric-label">Tenant scope</span>
-                  <strong>{currentUser.role === "SYS_ADMIN" ? "Live" : "Fixed by role"}</strong>
-                </li>
+                {auditReviewControls.map((item) => (
+                  <li key={item.label}>
+                    <span className="metric-label">{item.label}</span>
+                    <strong>
+                      {item.label === "Tenant scope" && currentUser.role !== "SYS_ADMIN" ? "Fixed by role" : item.value}
+                    </strong>
+                  </li>
+                ))}
               </ul>
             </div>
           </SurfaceCard>
