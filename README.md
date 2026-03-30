@@ -2,6 +2,10 @@
 
 Multi-tenant SaaS portal UI built with React and TypeScript, integrating with an IAM backend for authentication, RBAC, user management, and audit visibility.
 
+## Architecture
+
+This application serves as the UI layer for the Identity Access Service (IAM), consuming its APIs for authentication, authorization, user management, and audit visibility.
+
 ## Stack
 
 - React
@@ -32,7 +36,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The default local frontend expects the IAM backend at `http://localhost:8000`.
+The application expects the IAM backend at `http://localhost:8000` in local development.
 
 ## Available Scripts
 
