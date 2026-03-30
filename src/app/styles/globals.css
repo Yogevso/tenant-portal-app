@@ -562,6 +562,11 @@ button {
   background: var(--warm-soft);
 }
 
+.status-pill.danger {
+  color: #7b281b;
+  background: rgba(170, 78, 50, 0.16);
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -876,6 +881,12 @@ button {
   gap: 18px;
 }
 
+.audit-toolbar-sticky {
+  position: sticky;
+  top: 16px;
+  z-index: 8;
+}
+
 .audit-toolbar-card {
   display: grid;
   gap: 22px;
@@ -925,6 +936,24 @@ button {
 
 .audit-filter-actions .button {
   min-width: 168px;
+}
+
+.audit-table-shell {
+  overflow: visible;
+}
+
+.audit-table-shell .audit-data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.audit-table-shell .audit-data-table th {
+  position: sticky;
+  top: var(--audit-table-header-offset, 212px);
+  z-index: 4;
+  background: rgba(255, 252, 247, 0.96);
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 
 .audit-data-table tbody tr {
@@ -1118,6 +1147,10 @@ ul {
   .audit-toolbar-header,
   .login-form-header {
     flex-direction: column;
+  }
+
+  .audit-toolbar-sticky {
+    top: 12px;
   }
 
   .audit-filter-grid {

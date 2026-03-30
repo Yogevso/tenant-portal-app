@@ -1,12 +1,15 @@
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
 
 import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatCard } from "../../../components/ui/StatCard";
 import { StatePanel } from "../../../components/ui/StatePanel";
-import { StatusPill } from "../../../components/ui/StatusPill";
+import { StatusPill, type StatusTone } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import type { Role } from "../../../types/auth";
 import type { AuditAction, AuditActor, AuditLogItem } from "../../../types/audit";
 import type { TenantRecord } from "../../../types/tenants";
 import { useAuth } from "../../auth/context/useAuth";
@@ -14,6 +17,7 @@ import { listManagedUsers, listTenants } from "../../users/api/userManagementApi
 import { listSystemAuditLogs, listTenantAuditLogs } from "../api/auditApi";
 
 const AUDIT_PAGE_SIZE = 20;
+const DEFAULT_AUDIT_TOOLBAR_HEIGHT = 184;
 
 const actionOptions: Array<{ value: "all" | AuditAction; label: string }> = [
   { value: "all", label: "All actions" },
@@ -27,11 +31,98 @@ const actionOptions: Array<{ value: "all" | AuditAction; label: string }> = [
   { value: "TENANT_UPDATED", label: "Tenant updated" },
 ];
 
+const auditActionValues: AuditAction[] = [
+  "LOGIN_SUCCESS",
+  "LOGIN_FAILURE",
+  "USER_CREATED",
+  "USER_DEACTIVATED",
+  "ROLE_CHANGED",
+  "TOKEN_REVOKED",
+  "TENANT_CREATED",
+  "TENANT_UPDATED",
+];
+
 const auditReviewControls = [
-  { label: "Action filter", value: "Live" },
-  { label: "Actor filter", value: "Live" },
+  { label: "Action filter", value: "URL-synced" },
+  { label: "Actor filter", value: "URL-synced" },
   { label: "Tenant scope", value: "Role-aware" },
 ] as const;
+
+function isAuditAction(value: string | null): value is AuditAction {
+  return auditActionValues.some((action) => action === value);
+}
+
+function parsePageValue(value: string | null) {
+  if (!value) {
+    return 1;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function setQueryParam(next: URLSearchParams, key: string, value: string | null | undefined) {
+  const normalizedValue = value?.trim();
+
+  if (normalizedValue) {
+    next.set(key, normalizedValue);
+    return;
+  }
+
+  next.delete(key);
+}
+
+function normalizeAuditSearchParams(
+  currentParams: URLSearchParams,
+  role: Role | undefined,
+  mutate: (next: URLSearchParams) => void,
+) {
+  const next = new URLSearchParams(currentParams);
+
+  mutate(next);
+
+  const action = next.get("action");
+
+  if (!isAuditAction(action)) {
+    next.delete("action");
+  }
+
+  const actor = next.get("actor")?.trim();
+
+  if (actor) {
+    next.set("actor", actor);
+  } else {
+    next.delete("actor");
+  }
+
+  if (role === "SYS_ADMIN") {
+    const tenant = next.get("tenant")?.trim();
+
+    if (tenant) {
+      next.set("tenant", tenant);
+    } else {
+      next.delete("tenant");
+    }
+  } else {
+    next.delete("tenant");
+  }
+
+  const page = next.get("page");
+
+  if (!page) {
+    next.delete("page");
+    return next;
+  }
+
+  const parsedPage = parsePageValue(page);
+
+  if (parsedPage <= 1 || String(parsedPage) !== page) {
+    next.delete("page");
+  }
+
+  return next;
+}
 
 function formatTimestamp(value: string) {
   const date = new Date(value);
@@ -77,6 +168,25 @@ function formatActionLabel(action: AuditAction) {
     .join(" ");
 }
 
+function getAuditActionTone(action: AuditAction): StatusTone {
+  switch (action) {
+    case "LOGIN_SUCCESS":
+    case "USER_CREATED":
+    case "TENANT_CREATED":
+      return "success";
+    case "LOGIN_FAILURE":
+      return "danger";
+    case "TOKEN_REVOKED":
+    case "USER_DEACTIVATED":
+      return "warning";
+    case "ROLE_CHANGED":
+    case "TENANT_UPDATED":
+      return "accent";
+    default:
+      return "neutral";
+  }
+}
+
 function formatDetailKey(key: string) {
   return key
     .replace(/_/g, " ")
@@ -105,12 +215,10 @@ function getDetailEntries(item: AuditLogItem) {
     ];
   }
 
-  return detailEntries
-    .slice(0, 2)
-    .map(([key, value]) => ({
-      key: formatDetailKey(key),
-      value: String(value),
-    }));
+  return detailEntries.slice(0, 2).map(([key, value]) => ({
+    key: formatDetailKey(key),
+    value: String(value),
+  }));
 }
 
 function formatUserAgent(value: string | null) {
@@ -134,31 +242,31 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export function AuditLogsPage() {
   const { authenticatedRequest, tenant: currentTenant, user: currentUser } = useAuth();
-  const [selectedTenantId, setSelectedTenantId] = useState("");
-  const [selectedAction, setSelectedAction] = useState<"all" | AuditAction>("all");
-  const [selectedActorId, setSelectedActorId] = useState("");
-  const [offset, setOffset] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [toolbarHeight, setToolbarHeight] = useState(DEFAULT_AUDIT_TOOLBAR_HEIGHT);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  const rawActionParam = searchParams.get("action");
+  const rawActorParam = searchParams.get("actor");
+  const rawTenantParam = searchParams.get("tenant");
+  const rawPageParam = searchParams.get("page");
+  const selectedAction = isAuditAction(rawActionParam) ? rawActionParam : "all";
+  const selectedActorId = rawActorParam?.trim() ?? "";
+  const requestedTenantId = rawTenantParam?.trim() ?? "";
+  const selectedTenantId =
+    currentUser?.role === "SYS_ADMIN" ? requestedTenantId : (currentTenant?.id ?? "");
+  const currentPage = parsePageValue(rawPageParam);
+  const offset = (currentPage - 1) * AUDIT_PAGE_SIZE;
+
+  const auditStickyStyles = {
+    "--audit-table-header-offset": `${toolbarHeight + 28}px`,
+  } as CSSProperties;
 
   const tenantsQuery = useQuery({
     queryKey: ["tenants"],
     queryFn: () => listTenants(authenticatedRequest),
     enabled: currentUser?.role === "SYS_ADMIN",
   });
-
-  useEffect(() => {
-    if (currentUser?.role !== "SYS_ADMIN") {
-      setSelectedTenantId(currentTenant?.id ?? "");
-    }
-  }, [currentTenant?.id, currentUser?.role]);
-
-  useEffect(() => {
-    setSelectedActorId("");
-    setOffset(0);
-  }, [selectedTenantId]);
-
-  useEffect(() => {
-    setOffset(0);
-  }, [selectedAction, selectedActorId]);
 
   const selectedTenant: TenantRecord | null =
     currentUser?.role === "SYS_ADMIN"
@@ -188,7 +296,7 @@ export function AuditLogsPage() {
       selectedTenantId,
       selectedAction,
       selectedActorId,
-      offset,
+      currentPage,
       AUDIT_PAGE_SIZE,
     ],
     queryFn: async () => {
@@ -232,10 +340,148 @@ export function AuditLogsPage() {
 
     return Array.from(actorMap.values()).sort((left, right) => left.label.localeCompare(right.label));
   }, [auditLogsQuery.data?.items, scopedUsersQuery.data]);
+
   const actorSelectOptions =
     selectedActorId && !actorOptions.some((actorOption) => actorOption.id === selectedActorId)
       ? [{ id: selectedActorId, label: "Selected actor" }, ...actorOptions]
       : actorOptions;
+
+  useEffect(() => {
+    if (!toolbarRef.current) {
+      return;
+    }
+
+    function updateToolbarHeight() {
+      const toolbarNode = toolbarRef.current;
+
+      if (!toolbarNode) {
+        return;
+      }
+
+      const nextHeight = Math.ceil(toolbarNode.getBoundingClientRect().height);
+
+      if (nextHeight > 0) {
+        setToolbarHeight(nextHeight);
+      }
+    }
+
+    updateToolbarHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateToolbarHeight());
+    observer.observe(toolbarRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const hasInvalidAction = rawActionParam !== null && !isAuditAction(rawActionParam);
+    const parsedPage = parsePageValue(rawPageParam);
+    const hasInvalidPage = rawPageParam !== null && (parsedPage <= 1 || String(parsedPage) !== rawPageParam);
+
+    if (!hasInvalidAction && !hasInvalidPage) {
+      return;
+    }
+
+    setSearchParams(
+      (currentParams) =>
+        normalizeAuditSearchParams(currentParams, currentUser?.role, (next) => {
+          if (hasInvalidAction) {
+            next.delete("action");
+          }
+
+          if (hasInvalidPage) {
+            next.delete("page");
+          }
+        }),
+      { replace: true },
+    );
+  }, [currentUser?.role, rawActionParam, rawPageParam, setSearchParams]);
+
+  useEffect(() => {
+    if (currentUser?.role === "SYS_ADMIN" || rawTenantParam === null) {
+      return;
+    }
+
+    setSearchParams(
+      (currentParams) =>
+        normalizeAuditSearchParams(currentParams, currentUser?.role, (next) => {
+          next.delete("tenant");
+        }),
+      { replace: true },
+    );
+  }, [currentUser?.role, rawTenantParam, setSearchParams]);
+
+  useEffect(() => {
+    if (currentUser?.role !== "SYS_ADMIN" || !requestedTenantId || !tenantsQuery.isSuccess) {
+      return;
+    }
+
+    const tenantExists = tenantsQuery.data.some((tenant) => tenant.id === requestedTenantId);
+
+    if (tenantExists) {
+      return;
+    }
+
+    setSearchParams(
+      (currentParams) =>
+        normalizeAuditSearchParams(currentParams, currentUser.role, (next) => {
+          next.delete("tenant");
+          next.delete("actor");
+          next.delete("page");
+        }),
+      { replace: true },
+    );
+  }, [currentUser?.role, requestedTenantId, setSearchParams, tenantsQuery.data, tenantsQuery.isSuccess]);
+
+  useEffect(() => {
+    if (!auditLogsQuery.isSuccess) {
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(auditLogsQuery.data.total / AUDIT_PAGE_SIZE));
+
+    if (currentPage <= totalPages) {
+      return;
+    }
+
+    setSearchParams(
+      (currentParams) =>
+        normalizeAuditSearchParams(currentParams, currentUser?.role, (next) => {
+          if (totalPages <= 1) {
+            next.delete("page");
+            return;
+          }
+
+          next.set("page", String(totalPages));
+        }),
+      { replace: true },
+    );
+  }, [auditLogsQuery.data, auditLogsQuery.isSuccess, currentPage, currentUser?.role, setSearchParams]);
+
+  function updateAuditSearchParams(
+    mutate: (next: URLSearchParams) => void,
+    options: { replace?: boolean } = {},
+  ) {
+    setSearchParams(
+      (currentParams) => normalizeAuditSearchParams(currentParams, currentUser?.role, mutate),
+      options,
+    );
+  }
+
+  function goToPage(nextPage: number) {
+    updateAuditSearchParams((next) => {
+      if (nextPage <= 1) {
+        next.delete("page");
+        return;
+      }
+
+      next.set("page", String(nextPage));
+    });
+  }
 
   if (!currentUser || !currentTenant) {
     return null;
@@ -246,8 +492,9 @@ export function AuditLogsPage() {
   const pageStart = totalItems === 0 ? 0 : offset + 1;
   const pageEnd = totalItems === 0 ? 0 : Math.min(offset + AUDIT_PAGE_SIZE, totalItems);
   const items = auditLogsQuery.data?.items ?? [];
-  const canGoBack = offset > 0;
-  const canGoForward = offset + AUDIT_PAGE_SIZE < totalItems;
+  const totalPages = Math.max(1, Math.ceil(totalItems / AUDIT_PAGE_SIZE));
+  const canGoBack = currentPage > 1;
+  const canGoForward = currentPage < totalPages;
 
   return (
     <>
@@ -258,7 +505,7 @@ export function AuditLogsPage() {
             ? "Inspect platform and tenant activity"
             : "Inspect tenant activity and security events"
         }
-        description="This audit viewer is wired to the IAM backend with role-aware scope, action filtering, actor filtering, and paginated event history."
+        description="This audit viewer is wired to the IAM backend with role-aware scope, action filtering, actor filtering, paginated event history, and shareable URL-backed filters."
         actions={
           <>
             <StatusPill tone="accent">Live Audit Feed</StatusPill>
@@ -287,90 +534,108 @@ export function AuditLogsPage() {
         />
       </div>
 
-      <div className="audit-page-stack">
-        <SurfaceCard className="audit-toolbar-card">
-          <div className="audit-toolbar-header">
-            <div className="stack">
-              <p className="eyebrow">Review Filters</p>
-              <h3>Refine the live event stream</h3>
-              <p className="helper-text">
-                Adjust action, actor, tenant scope, and backend pagination without leaving the page.
-              </p>
+      <div className="audit-page-stack" style={auditStickyStyles}>
+        <div className="audit-toolbar-sticky" ref={toolbarRef}>
+          <SurfaceCard className="audit-toolbar-card">
+            <div className="audit-toolbar-header">
+              <div className="stack">
+                <p className="eyebrow">Review Filters</p>
+                <h3>Refine the live event stream</h3>
+                <p className="helper-text">
+                  Adjust action, actor, tenant scope, and backend pagination without leaving the page.
+                </p>
+              </div>
+
+              <StatusPill tone="accent">
+                {isGlobalSystemView ? "System-wide query" : "Tenant-scoped query"}
+              </StatusPill>
             </div>
 
-            <StatusPill tone="accent">
-              {isGlobalSystemView ? "System-wide query" : "Tenant-scoped query"}
-            </StatusPill>
-          </div>
-
-          <div className="audit-filter-grid">
-            <label className="audit-filter-field">
-              <span className="audit-filter-label">Action</span>
-              <select
-                aria-label="Filter audit events by action"
-                className="select"
-                value={selectedAction}
-                onChange={(event) => setSelectedAction(event.target.value as "all" | AuditAction)}
-              >
-                {actionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="audit-filter-field">
-              <span className="audit-filter-label">Actor</span>
-              <select
-                aria-label="Filter audit events by actor"
-                className="select"
-                value={selectedActorId}
-                onChange={(event) => setSelectedActorId(event.target.value)}
-                disabled={actorSelectOptions.length === 0 && selectedActorId.length === 0}
-              >
-                <option value="">All actors</option>
-                {actorSelectOptions.map((actorOption) => (
-                  <option key={actorOption.id} value={actorOption.id}>
-                    {actorOption.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {currentUser.role === "SYS_ADMIN" ? (
+            <div className="audit-filter-grid">
               <label className="audit-filter-field">
-                <span className="audit-filter-label">Tenant scope</span>
+                <span className="audit-filter-label">Action</span>
                 <select
-                  aria-label="Filter audit events by tenant scope"
+                  aria-label="Filter audit events by action"
                   className="select"
-                  value={selectedTenantId}
-                  onChange={(event) => setSelectedTenantId(event.target.value)}
-                  disabled={tenantsQuery.isPending}
+                  value={selectedAction}
+                  onChange={(event) => {
+                    updateAuditSearchParams((next) => {
+                      setQueryParam(next, "action", event.target.value === "all" ? null : event.target.value);
+                      next.delete("page");
+                    });
+                  }}
                 >
-                  <option value="">All tenants</option>
-                  {tenantsQuery.data?.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.name} ({tenant.slug})
+                  {actionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </label>
-            ) : null}
 
-            <div className="audit-filter-actions">
-              <button
-                aria-busy={auditLogsQuery.isFetching}
-                className="button button-secondary"
-                type="button"
-                onClick={() => void auditLogsQuery.refetch()}
-                disabled={auditLogsQuery.isFetching}
-              >
-                {auditLogsQuery.isFetching ? "Refreshing..." : "Refresh events"}
-              </button>
+              <label className="audit-filter-field">
+                <span className="audit-filter-label">Actor</span>
+                <select
+                  aria-label="Filter audit events by actor"
+                  className="select"
+                  value={selectedActorId}
+                  onChange={(event) => {
+                    updateAuditSearchParams((next) => {
+                      setQueryParam(next, "actor", event.target.value);
+                      next.delete("page");
+                    });
+                  }}
+                  disabled={actorSelectOptions.length === 0 && selectedActorId.length === 0}
+                >
+                  <option value="">All actors</option>
+                  {actorSelectOptions.map((actorOption) => (
+                    <option key={actorOption.id} value={actorOption.id}>
+                      {actorOption.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {currentUser.role === "SYS_ADMIN" ? (
+                <label className="audit-filter-field">
+                  <span className="audit-filter-label">Tenant scope</span>
+                  <select
+                    aria-label="Filter audit events by tenant scope"
+                    className="select"
+                    value={selectedTenantId}
+                    onChange={(event) => {
+                      updateAuditSearchParams((next) => {
+                        setQueryParam(next, "tenant", event.target.value);
+                        next.delete("actor");
+                        next.delete("page");
+                      });
+                    }}
+                    disabled={tenantsQuery.isPending}
+                  >
+                    <option value="">All tenants</option>
+                    {tenantsQuery.data?.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name} ({tenant.slug})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <div className="audit-filter-actions">
+                <button
+                  aria-busy={auditLogsQuery.isFetching}
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => void auditLogsQuery.refetch()}
+                  disabled={auditLogsQuery.isFetching}
+                >
+                  {auditLogsQuery.isFetching ? "Refreshing..." : "Refresh events"}
+                </button>
+              </div>
             </div>
-          </div>
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
 
         {tenantsQuery.isError ? (
           <InlineAlert tone="warning" title="Tenant scopes unavailable">
@@ -421,7 +686,7 @@ export function AuditLogsPage() {
           />
         ) : (
           <>
-            <div className="table-shell">
+            <div className="table-shell audit-table-shell">
               <table className="data-table audit-data-table">
                 <colgroup>
                   <col className="audit-col-timestamp" />
@@ -463,7 +728,7 @@ export function AuditLogsPage() {
                           </div>
                         </td>
                         <td data-label="Action">
-                          <StatusPill tone="accent">{formatActionLabel(item.action)}</StatusPill>
+                          <StatusPill tone={getAuditActionTone(item.action)}>{formatActionLabel(item.action)}</StatusPill>
                         </td>
                         <td data-label="Scope">
                           <div className="stack stack-tight">
@@ -517,7 +782,8 @@ export function AuditLogsPage() {
                     Showing {pageStart}-{pageEnd} of {totalItems}
                   </strong>
                   <span className="helper-text">
-                    Results are paginated directly by the backend audit endpoint.
+                    Page {currentPage} of {totalPages}. Results are paginated directly by the backend
+                    audit endpoint.
                   </span>
                 </div>
 
@@ -525,7 +791,7 @@ export function AuditLogsPage() {
                   <button
                     className="button button-secondary"
                     type="button"
-                    onClick={() => setOffset((currentOffset) => Math.max(0, currentOffset - AUDIT_PAGE_SIZE))}
+                    onClick={() => goToPage(currentPage - 1)}
                     disabled={!canGoBack || auditLogsQuery.isFetching}
                   >
                     Previous
@@ -533,7 +799,7 @@ export function AuditLogsPage() {
                   <button
                     className="button button-secondary"
                     type="button"
-                    onClick={() => setOffset((currentOffset) => currentOffset + AUDIT_PAGE_SIZE)}
+                    onClick={() => goToPage(currentPage + 1)}
                     disabled={!canGoForward || auditLogsQuery.isFetching}
                   >
                     Next

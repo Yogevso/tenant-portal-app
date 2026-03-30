@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type StatusTone = "neutral" | "accent" | "success" | "warning";
+export type StatusTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 interface StatusPillProps {
   children: ReactNode;
