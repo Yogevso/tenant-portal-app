@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { AuditTableSkeleton, StatCardSkeleton } from "../../../components/ui/Skeleton";
 import { StatCard } from "../../../components/ui/StatCard";
 import { StatePanel } from "../../../components/ui/StatePanel";
 import { StatusPill, type StatusTone } from "../../../components/ui/StatusPill";
@@ -517,21 +518,31 @@ export function AuditLogsPage() {
       />
 
       <div className="stat-grid">
-        <StatCard
-          label="Events In Scope"
-          value={auditLogsQuery.isPending ? "..." : String(totalItems)}
-          note="Total matching events returned by the IAM audit endpoint."
-        />
-        <StatCard
-          label="Current Window"
-          value={auditLogsQuery.isPending ? "..." : `${pageStart}-${pageEnd}`}
-          note="Current paginated slice of the matching event stream."
-        />
-        <StatCard
-          label="Scope"
-          value={formatScopeLabel(selectedTenant, isGlobalSystemView)}
-          note="System admins can stay global or narrow to a single tenant."
-        />
+        {auditLogsQuery.isPending ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Events In Scope"
+              value={String(totalItems)}
+              note="Total matching events returned by the IAM audit endpoint."
+            />
+            <StatCard
+              label="Current Window"
+              value={`${pageStart}-${pageEnd}`}
+              note="Current paginated slice of the matching event stream."
+            />
+            <StatCard
+              label="Scope"
+              value={formatScopeLabel(selectedTenant, isGlobalSystemView)}
+              note="System admins can stay global or narrow to a single tenant."
+            />
+          </>
+        )}
       </div>
 
       <div className="audit-page-stack" style={auditStickyStyles}>
@@ -656,12 +667,7 @@ export function AuditLogsPage() {
         </InlineAlert>
 
         {auditLogsQuery.isPending ? (
-          <StatePanel
-            eyebrow="Loading"
-            tone="accent"
-            title="Loading audit events"
-            description="The portal is fetching the current event stream from the IAM backend."
-          />
+          <AuditTableSkeleton />
         ) : auditLogsQuery.isError ? (
           <StatePanel
             eyebrow="Sync Error"

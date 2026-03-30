@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { UsersTableSkeleton } from "../../../components/ui/Skeleton";
 import { StatePanel } from "../../../components/ui/StatePanel";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
@@ -418,12 +419,7 @@ export function UsersPage() {
           </div>
 
           {usersQuery.isPending ? (
-            <StatePanel
-              eyebrow="Loading"
-              tone="accent"
-              title="Loading users"
-              description="The portal is fetching the current user list for the selected tenant scope."
-            />
+            <UsersTableSkeleton />
           ) : usersQuery.isError ? (
             <StatePanel
               eyebrow="Sync Error"

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatCard } from "../../../components/ui/StatCard";
+import { DashboardSkeleton, StatCardSkeleton } from "../../../components/ui/Skeleton";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
 import type { SystemAdminSummary, TenantAdminSummary } from "../../../types/auth";
@@ -43,7 +44,7 @@ export function DashboardPage() {
   });
 
   if (!user || !tenant) {
-    return null;
+    return <DashboardSkeleton />;
   }
 
   const systemSummary =
@@ -177,9 +178,11 @@ export function DashboardPage() {
       </div>
 
       <div className="stat-grid">
-        {statCards.map((card) => (
-          <StatCard key={card.label} label={card.label} value={card.value} note={card.note} />
-        ))}
+        {isAdmin && summaryQuery.isPending
+          ? Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} />)
+          : statCards.map((card) => (
+              <StatCard key={card.label} label={card.label} value={card.value} note={card.note} />
+            ))}
       </div>
 
       <div className="tile-grid">
