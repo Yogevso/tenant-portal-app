@@ -1,2 +1,71 @@
 # tenant-portal-app
-Multi-tenant SaaS portal UI built with React and TypeScript, integrating with an IAM backend for authentication, RBAC, and user management.
+
+Multi-tenant SaaS portal UI built with React and TypeScript, integrating with an IAM backend for authentication, RBAC, user management, and audit visibility.
+
+## Stack
+
+- React
+- TypeScript
+- Vite
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+
+## Getting Started
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+3. Start the development server:
+
+```bash
+npm run dev
+```
+
+## Available Scripts
+
+- `npm run dev` - start the Vite development server
+- `npm run build` - run TypeScript build and create a production bundle
+- `npm run lint` - run ESLint
+- `npm run preview` - preview the production build locally
+
+## Current Scope
+
+The project currently includes:
+
+- Phase 1 frontend scaffold and routing foundation
+- Shared app shell and responsive layout
+- Initial pages for login, dashboard, user management, audit logs, unauthorized, and not found states
+- Query provider and environment configuration setup
+
+## Project Structure
+
+```text
+src/
+  app/
+    layouts/
+    providers/
+    router/
+    styles/
+  components/
+    ui/
+  features/
+    auth/
+    audit-logs/
+    dashboard/
+    system/
+    users/
+  lib/
+    config/
+  types/
+```
