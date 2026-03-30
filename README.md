@@ -152,9 +152,13 @@ GitHub Actions is configured in `.github/workflows/ci.yml` to run:
 The project currently includes:
 
 - Auth provider with login, logout, refresh-based session restore, and protected route guards
+- Local demo login helper for fast onboarding in development contexts
 - Shared app shell with role-aware navigation for `SYS_ADMIN`, `TENANT_ADMIN`, and `USER`
+- Compact tablet sidebar rail (769-1120 px) with tooltip labels before full mobile collapse at 768 px
 - Live dashboard session context plus IAM-backed summary metrics for administrator roles
 - IAM-backed user-management and audit-log workflows for authorized administrator roles
+- Audit log viewer with URL-synced filters (action, actor, tenant, page), sticky toolbar, sticky table headers, and semantic action pills
+- Shared loading skeleton system with shimmer animation (respects `prefers-reduced-motion`) wired into dashboard, user management, and audit log pages
 - Query provider and environment configuration setup
 - Production packaging and CI validation scaffolding
 
@@ -163,12 +167,12 @@ The project currently includes:
 ```text
 src/
   app/
-    layouts/
+    layouts/        AppShell with desktop, tablet rail, and mobile responsive modes
     providers/
     router/
-    styles/
+    styles/         Global stylesheet with skeleton animation and three-tier responsive breakpoints
   components/
-    ui/
+    ui/             Shared primitives: StatusPill, StatCard, SurfaceCard, StatePanel, Skeleton, etc.
   features/
     auth/
     audit-logs/
