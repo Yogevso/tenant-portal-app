@@ -575,6 +575,11 @@ button {
   flex-wrap: wrap;
 }
 
+.pagination-bar {
+  justify-content: space-between;
+  align-items: center;
+}
+
 .select-inline {
   min-width: 160px;
 }
