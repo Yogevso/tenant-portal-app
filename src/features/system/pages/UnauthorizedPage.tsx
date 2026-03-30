@@ -1,8 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 
+import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatusPill } from "../../../components/ui/StatusPill";
-import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import type { Role } from "../../../types/auth";
 import { getRoleTone } from "../../auth/access";
 import { useAuth } from "../../auth/context/useAuth";
@@ -27,24 +28,26 @@ export function UnauthorizedPage() {
         description={`Your current ${user?.role ?? "signed-in"} session is not allowed to open ${targetPath}.`}
       />
 
-      <SurfaceCard>
-        <div className="stack">
-          <h3>What this session can do</h3>
-          <p className="helper-text">
-            Route guards are active now. The frontend hides disallowed navigation by role, but direct
-            route attempts still land here instead of showing a broken screen.
-          </p>
-          {user ? <StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill> : null}
-          {requiredRoles.length > 0 ? (
-            <p className="helper-text">Required role: {requiredRoles.join(" or ")}</p>
-          ) : null}
-          <div className="split-actions">
+      <StatePanel
+        eyebrow="Route Blocked"
+        tone="warning"
+        title="This route is outside your current role scope"
+        description="Client-side route guards are active. The app hides disallowed navigation by role, and direct route attempts land here instead of showing a broken screen."
+        actions={
+          <>
             <Link className="button button-primary" to="/dashboard">
               Return to dashboard
             </Link>
-          </div>
-        </div>
-      </SurfaceCard>
+          </>
+        }
+      >
+        {user ? <StatusPill tone={getRoleTone(user.role)}>{user.role}</StatusPill> : null}
+        {requiredRoles.length > 0 ? (
+          <InlineAlert tone="warning" title="Required role">
+            {requiredRoles.join(" or ")}
+          </InlineAlert>
+        ) : null}
+      </StatePanel>
     </>
   );
 }

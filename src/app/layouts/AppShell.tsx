@@ -44,6 +44,10 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+
       <aside className="sidebar">
         <div className="brand-block">
           <p className="eyebrow">Production-style SaaS Portal</p>
@@ -98,7 +102,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="page">
+        <main className="page" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

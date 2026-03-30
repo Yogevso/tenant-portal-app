@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { StatusPill } from "../../../components/ui/StatusPill";
-import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import type { Role } from "../../../types/auth";
 import { useAuth } from "../context/useAuth";
 
@@ -17,13 +16,13 @@ interface RequireRolesProps {
 function AuthGateScreen(props: { eyebrow: string; title: string; description: string }) {
   return (
     <main className="login-page auth-gate">
-      <SurfaceCard>
-        <div className="stack auth-gate-card">
-          <StatusPill tone="accent">{props.eyebrow}</StatusPill>
-          <h2>{props.title}</h2>
-          <p className="page-description">{props.description}</p>
-        </div>
-      </SurfaceCard>
+      <StatePanel
+        centered
+        eyebrow={props.eyebrow}
+        tone="accent"
+        title={props.title}
+        description={props.description}
+      />
     </main>
   );
 }

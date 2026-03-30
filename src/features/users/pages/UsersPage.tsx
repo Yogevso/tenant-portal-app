@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
 import { ApiError } from "../../../lib/api/client";
@@ -334,6 +336,7 @@ export function UsersPage() {
           <SurfaceCard>
             <div className="toolbar toolbar-wrap">
               <input
+                aria-label="Search users by name or email"
                 className="input"
                 type="search"
                 placeholder="Search by name or email"
@@ -342,6 +345,7 @@ export function UsersPage() {
               />
 
               <select
+                aria-label="Filter users by role"
                 className="select"
                 value={roleFilter}
                 onChange={(event) => setRoleFilter(event.target.value as RoleFilterValue)}
@@ -354,6 +358,7 @@ export function UsersPage() {
 
               {currentUser.role === "SYS_ADMIN" ? (
                 <select
+                  aria-label="Select tenant scope"
                   className="select"
                   value={selectedTenantId}
                   onChange={(event) => setSelectedTenantId(event.target.value)}
@@ -368,6 +373,7 @@ export function UsersPage() {
               ) : null}
 
               <button
+                aria-busy={usersQuery.isFetching}
                 className="button button-secondary"
                 type="button"
                 onClick={() => {
@@ -382,15 +388,24 @@ export function UsersPage() {
           </SurfaceCard>
 
           {tenantsQuery.isError ? (
-            <div className="alert alert-warning" role="status">
+            <InlineAlert tone="warning" title="Tenant list unavailable">
               {getErrorMessage(tenantsQuery.error, "The tenant list could not be loaded.")}
-            </div>
+            </InlineAlert>
           ) : null}
 
           {pageNotice ? (
-            <div className={`alert alert-${pageNotice.tone}`} role="status">
+            <InlineAlert
+              tone={pageNotice.tone === "danger" ? "danger" : pageNotice.tone}
+              title={
+                pageNotice.tone === "success"
+                  ? "Update saved"
+                  : pageNotice.tone === "warning"
+                    ? "Heads up"
+                    : "Request failed"
+              }
+            >
               {pageNotice.text}
-            </div>
+            </InlineAlert>
           ) : null}
 
           <div className="info-banner">
@@ -403,42 +418,42 @@ export function UsersPage() {
           </div>
 
           {usersQuery.isPending ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>Loading users</h3>
-                <p className="helper-text">
-                  The portal is fetching the current user list for the selected tenant scope.
-                </p>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Loading"
+              tone="accent"
+              title="Loading users"
+              description="The portal is fetching the current user list for the selected tenant scope."
+            />
           ) : usersQuery.isError ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>User list unavailable</h3>
-                <p className="helper-text">
-                  {getErrorMessage(usersQuery.error, "The IAM service could not return the current user list.")}
-                </p>
-                <div className="split-actions">
-                  <button className="button button-primary" type="button" onClick={() => void usersQuery.refetch()}>
-                    Retry user list
-                  </button>
-                </div>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Sync Error"
+              tone="warning"
+              title="User list unavailable"
+              description={getErrorMessage(
+                usersQuery.error,
+                "The IAM service could not return the current user list.",
+              )}
+              actions={
+                <button className="button button-primary" type="button" onClick={() => void usersQuery.refetch()}>
+                  Retry user list
+                </button>
+              }
+            />
           ) : filteredUsers.length === 0 ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>{usersQuery.data?.length ? "No users match the current filters" : "No users in scope yet"}</h3>
-                <p className="helper-text">
-                  {usersQuery.data?.length
-                    ? "Adjust the search or role filter to broaden the current result set."
-                    : "Create the first user for this tenant from the form on the right."}
-                </p>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Empty State"
+              tone="neutral"
+              title={usersQuery.data?.length ? "No users match the current filters" : "No users in scope yet"}
+              description={
+                usersQuery.data?.length
+                  ? "Adjust the search or role filter to broaden the current result set."
+                  : "Create the first user for this tenant from the form on the right."
+              }
+            />
           ) : (
             <div className="table-shell">
               <table className="data-table">
+                <caption className="sr-only">Users in the current tenant scope</caption>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -464,7 +479,7 @@ export function UsersPage() {
 
                     return (
                       <tr key={managedUser.id}>
-                        <td>
+                        <td data-label="Name">
                           <div className="stack stack-tight">
                             <strong>{managedUser.fullName}</strong>
                             {isCurrentSession ? (
@@ -472,18 +487,19 @@ export function UsersPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td>{managedUser.email}</td>
-                        <td>
+                        <td data-label="Email">{managedUser.email}</td>
+                        <td data-label="Role">
                           <StatusPill tone={getRoleTone(managedUser.role)}>{managedUser.role}</StatusPill>
                         </td>
-                        <td>
+                        <td data-label="Status">
                           <StatusPill tone={getStatusTone(managedUser.isActive)}>
                             {managedUser.isActive ? "Active" : "Inactive"}
                           </StatusPill>
                         </td>
-                        <td>
+                        <td data-label="Actions">
                           <div className="table-actions">
                             <select
+                              aria-label={`Change role for ${managedUser.fullName}`}
                               className="select select-inline"
                               value={draftRole}
                               onChange={(event) => handleRoleDraftChange(managedUser.id, event.target.value as Role)}
@@ -497,6 +513,7 @@ export function UsersPage() {
                             </select>
 
                             <button
+                              aria-label={`Save role for ${managedUser.fullName}`}
                               className="button button-secondary"
                               type="button"
                               onClick={() => handleRoleSave(managedUser)}
@@ -506,6 +523,11 @@ export function UsersPage() {
                             </button>
 
                             <button
+                              aria-label={
+                                isCurrentSession
+                                  ? `${managedUser.fullName} is the current session`
+                                  : `Deactivate ${managedUser.fullName}`
+                              }
                               className="button button-danger"
                               type="button"
                               onClick={() => handleDeactivateUser(managedUser)}
@@ -534,52 +556,84 @@ export function UsersPage() {
                 tenant.
               </p>
 
-              <form className="form-grid" onSubmit={handleSubmit(handleCreateUser)}>
+              <form className="form-grid" onSubmit={handleSubmit(handleCreateUser)} noValidate>
                 <div className="field">
                   <label htmlFor="fullName">Full Name</label>
                   <input
+                    aria-describedby={errors.fullName ? "create-fullName-error" : undefined}
+                    aria-invalid={Boolean(errors.fullName)}
                     className="input"
                     id="fullName"
                     placeholder="Jordan Smith"
                     {...register("fullName")}
                   />
-                  {errors.fullName ? <span className="field-error">{errors.fullName.message}</span> : null}
+                  {errors.fullName ? (
+                    <span className="field-error" id="create-fullName-error">
+                      {errors.fullName.message}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="field">
                   <label htmlFor="email">Email</label>
                   <input
+                    aria-describedby={errors.email ? "create-email-error" : undefined}
+                    aria-invalid={Boolean(errors.email)}
                     className="input"
                     id="email"
                     type="email"
                     placeholder="jordan@tenant.io"
                     {...register("email")}
                   />
-                  {errors.email ? <span className="field-error">{errors.email.message}</span> : null}
+                  {errors.email ? (
+                    <span className="field-error" id="create-email-error">
+                      {errors.email.message}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="field">
                   <label htmlFor="password">Temporary Password</label>
                   <input
+                    aria-describedby={errors.password ? "create-password-error" : "create-password-hint"}
+                    aria-invalid={Boolean(errors.password)}
                     className="input"
                     id="password"
                     type="password"
                     placeholder="At least 8 characters"
                     {...register("password")}
                   />
-                  {errors.password ? <span className="field-error">{errors.password.message}</span> : null}
+                  {errors.password ? (
+                    <span className="field-error" id="create-password-error">
+                      {errors.password.message}
+                    </span>
+                  ) : (
+                    <span className="helper-text" id="create-password-hint">
+                      Use at least 8 characters so the new user can authenticate successfully.
+                    </span>
+                  )}
                 </div>
 
                 <div className="field">
                   <label htmlFor="role">Role</label>
-                  <select className="select" id="role" {...register("role")}>
+                  <select
+                    aria-describedby={errors.role ? "create-role-error" : undefined}
+                    aria-invalid={Boolean(errors.role)}
+                    className="select"
+                    id="role"
+                    {...register("role")}
+                  >
                     {roleOptions.map((roleOption) => (
                       <option key={roleOption} value={roleOption}>
                         {roleOption}
                       </option>
                     ))}
                   </select>
-                  {errors.role ? <span className="field-error">{errors.role.message}</span> : null}
+                  {errors.role ? (
+                    <span className="field-error" id="create-role-error">
+                      {errors.role.message}
+                    </span>
+                  ) : null}
                 </div>
 
                 <label className="checkbox-row" htmlFor="isActive">
@@ -591,6 +645,7 @@ export function UsersPage() {
                 </label>
 
                 <button
+                  aria-busy={createUserMutation.isPending}
                   className="button button-primary"
                   type="submit"
                   disabled={!selectedTenantId || createUserMutation.isPending}

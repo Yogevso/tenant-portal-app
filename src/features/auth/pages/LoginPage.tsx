@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
 import { ApiError } from "../../../lib/api/client";
 import { env } from "../../../lib/config/env";
@@ -126,40 +127,48 @@ export function LoginPage() {
           </div>
 
           {sessionNotice === "session_expired" ? (
-            <div className="alert alert-warning" role="status">
+            <InlineAlert tone="warning" title="Session expired">
               Your previous session expired. Sign in again to continue.
-            </div>
+            </InlineAlert>
           ) : null}
 
           {sessionNotice === "service_unavailable" ? (
-            <div className="alert alert-warning" role="status">
+            <InlineAlert tone="warning" title="Session restore unavailable">
               The portal could not restore the last session. Verify that the IAM service is running,
               then sign in again.
-            </div>
+            </InlineAlert>
           ) : null}
 
           {formError ? (
-            <div className="alert alert-danger" role="alert">
+            <InlineAlert tone="danger" title="Sign-in failed">
               {formError}
-            </div>
+            </InlineAlert>
           ) : null}
 
-          <form className="form-grid" onSubmit={handleSubmit(onSubmit)}>
+          <form className="form-grid" onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="field">
               <label htmlFor="tenantSlug">Tenant Slug</label>
               <input
+                aria-describedby={errors.tenantSlug ? "tenantSlug-error" : undefined}
+                aria-invalid={Boolean(errors.tenantSlug)}
                 autoComplete="organization"
                 className="input"
                 id="tenantSlug"
                 placeholder="platform"
                 {...register("tenantSlug")}
               />
-              {errors.tenantSlug ? <span className="field-error">{errors.tenantSlug.message}</span> : null}
+              {errors.tenantSlug ? (
+                <span className="field-error" id="tenantSlug-error">
+                  {errors.tenantSlug.message}
+                </span>
+              ) : null}
             </div>
 
             <div className="field">
               <label htmlFor="email">Email</label>
               <input
+                aria-describedby={errors.email ? "email-error" : undefined}
+                aria-invalid={Boolean(errors.email)}
                 autoComplete="username"
                 className="input"
                 id="email"
@@ -167,12 +176,18 @@ export function LoginPage() {
                 placeholder="admin@tenant.io"
                 {...register("email")}
               />
-              {errors.email ? <span className="field-error">{errors.email.message}</span> : null}
+              {errors.email ? (
+                <span className="field-error" id="email-error">
+                  {errors.email.message}
+                </span>
+              ) : null}
             </div>
 
             <div className="field">
               <label htmlFor="password">Password</label>
               <input
+                aria-describedby={errors.password ? "password-error" : undefined}
+                aria-invalid={Boolean(errors.password)}
                 autoComplete="current-password"
                 className="input"
                 id="password"
@@ -180,10 +195,19 @@ export function LoginPage() {
                 placeholder="Enter your password"
                 {...register("password")}
               />
-              {errors.password ? <span className="field-error">{errors.password.message}</span> : null}
+              {errors.password ? (
+                <span className="field-error" id="password-error">
+                  {errors.password.message}
+                </span>
+              ) : null}
             </div>
 
-            <button className="button button-primary" type="submit" disabled={isSubmitting || loginMutation.isPending}>
+            <button
+              aria-busy={isSubmitting || loginMutation.isPending}
+              className="button button-primary"
+              type="submit"
+              disabled={isSubmitting || loginMutation.isPending}
+            >
               {isSubmitting || loginMutation.isPending ? "Signing in..." : "Sign in to the portal"}
             </button>
           </form>

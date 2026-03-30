@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatCard } from "../../../components/ui/StatCard";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
 import type { AuditAction, AuditActor, AuditLogItem } from "../../../types/audit";
@@ -63,6 +65,10 @@ function summarizeDetails(item: AuditLogItem) {
     .slice(0, 3)
     .map(([key, value]) => `${key}: ${String(value)}`)
     .join(" | ");
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export function AuditLogsPage() {
@@ -225,6 +231,7 @@ export function AuditLogsPage() {
           <SurfaceCard>
             <div className="toolbar toolbar-wrap">
               <select
+                aria-label="Filter audit events by action"
                 className="select"
                 value={selectedAction}
                 onChange={(event) => setSelectedAction(event.target.value as "all" | AuditAction)}
@@ -237,6 +244,7 @@ export function AuditLogsPage() {
               </select>
 
               <select
+                aria-label="Filter audit events by actor"
                 className="select"
                 value={selectedActorId}
                 onChange={(event) => setSelectedActorId(event.target.value)}
@@ -252,6 +260,7 @@ export function AuditLogsPage() {
 
               {currentUser.role === "SYS_ADMIN" ? (
                 <select
+                  aria-label="Filter audit events by tenant scope"
                   className="select"
                   value={selectedTenantId}
                   onChange={(event) => setSelectedTenantId(event.target.value)}
@@ -267,6 +276,7 @@ export function AuditLogsPage() {
               ) : null}
 
               <button
+                aria-busy={auditLogsQuery.isFetching}
                 className="button button-secondary"
                 type="button"
                 onClick={() => void auditLogsQuery.refetch()}
@@ -278,18 +288,16 @@ export function AuditLogsPage() {
           </SurfaceCard>
 
           {tenantsQuery.isError ? (
-            <div className="alert alert-warning" role="status">
-              {tenantsQuery.error instanceof Error
-                ? tenantsQuery.error.message
-                : "The tenant scope list could not be loaded."}
-            </div>
+            <InlineAlert tone="warning" title="Tenant scopes unavailable">
+              {getErrorMessage(tenantsQuery.error, "The tenant scope list could not be loaded.")}
+            </InlineAlert>
           ) : null}
 
           {scopedUsersQuery.isError ? (
-            <div className="alert alert-warning" role="status">
+            <InlineAlert tone="warning" title="Actor options limited">
               Actor options are limited to the current event page because the scoped user list could not
               be loaded.
-            </div>
+            </InlineAlert>
           ) : null}
 
           <div className="info-banner">
@@ -301,43 +309,39 @@ export function AuditLogsPage() {
           </div>
 
           {auditLogsQuery.isPending ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>Loading audit events</h3>
-                <p className="helper-text">
-                  The portal is fetching the current event stream from the IAM backend.
-                </p>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Loading"
+              tone="accent"
+              title="Loading audit events"
+              description="The portal is fetching the current event stream from the IAM backend."
+            />
           ) : auditLogsQuery.isError ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>Audit log feed unavailable</h3>
-                <p className="helper-text">
-                  {auditLogsQuery.error instanceof Error
-                    ? auditLogsQuery.error.message
-                    : "The IAM service could not return audit events for the current scope."}
-                </p>
-                <div className="split-actions">
-                  <button className="button button-primary" type="button" onClick={() => void auditLogsQuery.refetch()}>
-                    Retry audit feed
-                  </button>
-                </div>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Sync Error"
+              tone="warning"
+              title="Audit log feed unavailable"
+              description={getErrorMessage(
+                auditLogsQuery.error,
+                "The IAM service could not return audit events for the current scope.",
+              )}
+              actions={
+                <button className="button button-primary" type="button" onClick={() => void auditLogsQuery.refetch()}>
+                  Retry audit feed
+                </button>
+              }
+            />
           ) : items.length === 0 ? (
-            <SurfaceCard>
-              <div className="stack">
-                <h3>No audit events match the current filters</h3>
-                <p className="helper-text">
-                  Adjust the scope, action, or actor filter to broaden the current result set.
-                </p>
-              </div>
-            </SurfaceCard>
+            <StatePanel
+              eyebrow="Empty State"
+              tone="neutral"
+              title="No audit events match the current filters"
+              description="Adjust the scope, action, or actor filter to broaden the current result set."
+            />
           ) : (
             <>
               <div className="table-shell">
                 <table className="data-table">
+                  <caption className="sr-only">Audit events in the current scope</caption>
                   <thead>
                     <tr>
                       <th>Timestamp</th>
@@ -351,29 +355,29 @@ export function AuditLogsPage() {
                   <tbody>
                     {items.map((item) => (
                       <tr key={item.id}>
-                        <td>{formatTimestamp(item.createdAt)}</td>
-                        <td>
+                        <td data-label="Timestamp">{formatTimestamp(item.createdAt)}</td>
+                        <td data-label="Actor">
                           <div className="stack stack-tight">
                             <strong>{item.actor?.fullName ?? "System"}</strong>
                             <span className="helper-text">{item.actor?.email ?? "No actor identity"}</span>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Action">
                           <StatusPill tone="accent">{item.action}</StatusPill>
                         </td>
-                        <td>
+                        <td data-label="Scope">
                           <div className="stack stack-tight">
                             <strong>{item.tenant?.name ?? "No tenant"}</strong>
                             <span className="helper-text">{item.tenant?.slug ?? "system scope"}</span>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Resource">
                           <div className="stack stack-tight">
                             <strong>{item.resourceType}</strong>
                             <span className="helper-text">{item.resourceId}</span>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Details">
                           <div className="stack stack-tight">
                             <span>{summarizeDetails(item)}</span>
                             {item.ipAddress || item.userAgent ? (

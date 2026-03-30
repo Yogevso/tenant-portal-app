@@ -1,14 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
+import { InlineAlert } from "../../../components/ui/InlineAlert";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { StatCard } from "../../../components/ui/StatCard";
 import { StatusPill } from "../../../components/ui/StatusPill";
 import { SurfaceCard } from "../../../components/ui/SurfaceCard";
+import type { SystemAdminSummary, TenantAdminSummary } from "../../../types/auth";
 import { getRoleTone } from "../../auth/access";
 import { getSystemAdminSummary, getTenantAdminSummary } from "../../auth/api/authApi";
 import { useAuth } from "../../auth/context/useAuth";
-import type { SystemAdminSummary, TenantAdminSummary } from "../../../types/auth";
 
 function formatMetric(value: number | undefined) {
   if (value === undefined) {
@@ -16,6 +17,10 @@ function formatMetric(value: number | undefined) {
   }
 
   return value.toLocaleString();
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export function DashboardPage() {
@@ -156,14 +161,16 @@ export function DashboardPage() {
             </ul>
 
             {summaryQuery.isError ? (
-              <div className="info-banner">
-                <strong>Live metrics unavailable</strong>
-                <p>
-                  {summaryQuery.error instanceof Error
-                    ? summaryQuery.error.message
-                    : "The dashboard could not load the current summary from the IAM service."}
-                </p>
-              </div>
+              <InlineAlert tone="warning" title="Live metrics unavailable">
+                {getErrorMessage(
+                  summaryQuery.error,
+                  "The dashboard could not load the current summary from the IAM service.",
+                )}
+              </InlineAlert>
+            ) : isAdmin && summaryQuery.isPending ? (
+              <InlineAlert tone="info" title="Live metrics loading">
+                The dashboard is refreshing the latest summary values for your current scope.
+              </InlineAlert>
             ) : null}
           </div>
         </SurfaceCard>
@@ -212,7 +219,7 @@ export function DashboardPage() {
             <h3>{isAdmin ? "Activity review is available" : "Administrative audit access is restricted"}</h3>
             <p className="helper-text">
               {isAdmin
-                ? "The audit route is now protected by role. Table data integration is the next feature slice."
+                ? "The audit route is live with backend pagination plus action, actor, and tenant-scope filtering. Date-range filtering remains blocked on backend support."
                 : "Audit visibility remains reserved for administrative roles even when a user knows the route."}
             </p>
             {isAdmin ? (
