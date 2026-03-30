@@ -52,6 +52,12 @@ const loginPrinciples = [
   "Role-aware route protection",
 ] as const;
 
+const demoAdminCredentials: LoginFormValues = {
+  tenantSlug: "platform",
+  email: "admin@platform.example",
+  password: "PortalAdmin123!",
+};
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,8 +68,10 @@ export function LoginPage() {
   const sessionNotice = routeState?.reason ?? authFailureReason;
   const {
     formState: { errors, isSubmitting },
+    clearErrors,
     handleSubmit,
     register,
+    reset,
     setError,
   } = useForm<LoginFormValues>({
     defaultValues: {
@@ -111,8 +119,17 @@ export function LoginPage() {
     loginMutation.mutate(values);
   }
 
+  function applyDemoCredentials() {
+    clearAuthFailureReason();
+    clearErrors();
+    setFormError(null);
+    reset(demoAdminCredentials);
+  }
+
   const apiTargetLabel =
     env.apiBaseUrl === "same-origin" ? "Current origin proxy to the IAM backend" : env.apiBaseUrl;
+  const showDemoHelper =
+    typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   return (
     <main className="login-page">
@@ -184,6 +201,27 @@ export function LoginPage() {
             <InlineAlert tone="danger" title="Sign-in failed">
               {formError}
             </InlineAlert>
+          ) : null}
+
+          {showDemoHelper ? (
+            <div className="login-demo-helper">
+              <div className="stack stack-tight">
+                <strong>Local demo admin</strong>
+                <span className="helper-text">
+                  Prefill <code>platform</code>, <code>admin@platform.example</code>, and the seeded
+                  demo password for this local environment.
+                </span>
+              </div>
+
+              <button
+                className="button button-secondary login-demo-button"
+                type="button"
+                onClick={applyDemoCredentials}
+                disabled={isSubmitting || loginMutation.isPending}
+              >
+                Use demo admin
+              </button>
+            </div>
           ) : null}
 
           <form className="form-grid" onSubmit={handleSubmit(onSubmit)} noValidate>

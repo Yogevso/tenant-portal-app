@@ -750,6 +750,32 @@ button {
   gap: 16px;
 }
 
+.login-demo-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(16, 32, 51, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.login-demo-helper strong {
+  font-size: 0.95rem;
+}
+
+.login-demo-helper code {
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(16, 32, 51, 0.06);
+  font-size: 0.88em;
+}
+
+.login-demo-button {
+  flex: 0 0 auto;
+}
+
 .login-form-panel .button-primary {
   width: 100%;
 }
@@ -1147,6 +1173,11 @@ ul {
   .audit-toolbar-header,
   .login-form-header {
     flex-direction: column;
+  }
+
+  .login-demo-helper {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .audit-toolbar-sticky {
