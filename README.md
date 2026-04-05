@@ -1,4 +1,6 @@
-# tenant-portal-app
+# Tenant Portal App
+
+> **Part of the [Orchestrix Platform](https://github.com/Yogevso/Orchestrix-Platform)** — the multi-tenant SaaS portal UI for the platform.
 
 Multi-tenant SaaS portal UI built with React and TypeScript, integrating with an IAM backend for authentication, RBAC, user management, and audit visibility.
 
